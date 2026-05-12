@@ -1,0 +1,36 @@
+# Security: Scripts with API Keys
+convert_html.py
+fetch_screen.py
+
+# Environment Secrets
+.env
+.env.local
+.env.*
+backend/.env
+
+# Data & Documentation
+*.pdf
+*.txt
+!requirements.txt
+!README.md
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+env/
+.env/
+
+# Node.js
+node_modules/
+.next/
+out/
+build/
+dist/
+npm-debug.log*
+
+# OS Files
+.DS_Store
+Thumbs.db

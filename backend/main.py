@@ -158,7 +158,8 @@ async def init_batches():
     # Helper to create initial batches with unique codes
     batches_to_create = [
         {"id": 1, "code": "CRIMSON2026", "story": "THE INVESTIGATION BEGINS AT THE CRIMSON ARCHIVE..."},
-        {"id": 2, "code": "VOIDSHADOW2026", "story": "THE SHADOWS HIDE THE DEEPEST SECRETS..."}
+        {"id": 2, "code": "VOIDSHADOW2026", "story": "THE SHADOWS HIDE THE DEEPEST SECRETS..."},
+        {"id": 3, "code": "DEATHLYSILENCE2026", "story": "ONLY SILENCE REMAINS IN THE FINAL CHAMBER..."}
     ]
     
     for b_data in batches_to_create:

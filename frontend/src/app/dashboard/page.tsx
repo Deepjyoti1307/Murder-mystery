@@ -118,7 +118,7 @@ export default function Dashboard() {
           </div>
 
           {/* Batches Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {/* Batch 1 */}
             <button 
               onClick={() => handleBatchClick(1)}
@@ -150,12 +150,34 @@ export default function Dashboard() {
                 Locked
               </div>
               <div className="p-8 space-y-8 flex flex-col items-center">
-                <h3 className="font-headline-xl text-3xl text-on-surface uppercase tracking-widest w-full">Batch 2</h3>
-                <div className="relative py-12">
+                <h3 className="font-headline-xl text-3xl text-on-surface uppercase tracking-widest w-full text-center">Batch 2</h3>
+                <div className="relative py-12 text-center w-full">
                   <span className="material-symbols-outlined text-8xl text-on-surface-variant/20 group-hover:text-blood-red/40 transition-colors duration-500">lock</span>
                 </div>
-                <p className="font-body-md text-on-surface-variant/60 text-center leading-relaxed">
-                  Secondary evidence compartment. Access restricted pending completion of Batch 1 analysis and authorization override.
+                <p className="font-body-md text-on-surface-variant/60 text-center leading-relaxed h-20">
+                  Secondary evidence compartment. Access restricted pending completion of Batch 1 analysis.
+                </p>
+                <div className="w-full bg-blood-red/20 border-2 border-blood-red group-hover:bg-blood-red text-white py-4 font-headline-xl text-xl uppercase tracking-widest transition-all duration-300 text-center">
+                  Unlock Access
+                </div>
+              </div>
+            </button>
+
+            {/* Batch 3 */}
+            <button 
+              onClick={() => handleBatchClick(3)}
+              className="group relative bg-void-black/60 border-2 border-blood-red/30 p-1 hover:border-crimson-glare transition-all duration-500 shadow-[0_0_20px_rgba(0,0,0,0.3)] text-left"
+            >
+              <div className="absolute top-4 right-4 bg-blood-red/10 border border-blood-red/40 text-blood-red text-[10px] px-3 py-1 uppercase font-bold tracking-widest">
+                Locked
+              </div>
+              <div className="p-8 space-y-8 flex flex-col items-center">
+                <h3 className="font-headline-xl text-3xl text-on-surface uppercase tracking-widest w-full text-center">Batch 3</h3>
+                <div className="relative py-12 text-center w-full">
+                  <span className="material-symbols-outlined text-8xl text-on-surface-variant/20 group-hover:text-blood-red/40 transition-colors duration-500">lock</span>
+                </div>
+                <p className="font-body-md text-on-surface-variant/60 text-center leading-relaxed h-20">
+                  Final evidence repository. High-level encryption applied. Requires maximum clearance for access.
                 </p>
                 <div className="w-full bg-blood-red/20 border-2 border-blood-red group-hover:bg-blood-red text-white py-4 font-headline-xl text-xl uppercase tracking-widest transition-all duration-300 text-center">
                   Unlock Access

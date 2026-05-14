@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
 import Logo from './logo.png';
 import BreathingText from "@/components/fancy/text/breathing-text";
+import { Shield } from 'lucide-react';
 
 // Dynamically import the 3D scene so it only runs on the client
 const Scene = dynamic(() => import('../components/Scene'), { ssr: false });
@@ -26,6 +27,10 @@ export default function LandingPage() {
           </div>
         </div>
         <div className="flex items-center gap-6">
+          <Link href="/admin/login" className="hidden md:flex items-center gap-2 text-white bg-zinc-900 hover:bg-blood-red px-8 py-2.5 border border-blood-red/40 text-xs font-bold uppercase tracking-[0.2em] transition-all shadow-[0_0_15px_rgba(220,20,60,0.1)] rounded-full">
+            <Shield size={14} className="text-blood-red group-hover:text-white" />
+            ADMIN
+          </Link>
           <Link href="/team" className="hidden md:block text-on-surface hover:text-white bg-blood-red/20 hover:bg-blood-red px-8 py-2.5 border border-blood-red/40 text-xs font-bold uppercase tracking-[0.2em] transition-all shadow-[0_0_15px_rgba(220,20,60,0.2)] rounded-full">
             KNOW THE TEAM
           </Link>

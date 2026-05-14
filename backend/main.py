@@ -165,11 +165,15 @@ async def start_batch(batch_id: int, request: StartRequest):
     return {"status": "timer_started", "start_time": team.start_time}
 
 @app.get("/api/quiz/{batch_id}/questions")
-async def get_questions(batch_id: int):
+async def get_questions(batch_id: int, clerk_id: str):
     batch = await Batch.find_one(Batch.batch_id == batch_id)
     if not batch:
         raise HTTPException(status_code=404, detail="BATCH NOT FOUND.")
     
+    team = await Team.find_one(Team.clerk_id == clerk_id, Team.batch_id == batch_id)
+    if not team:
+        raise HTTPException(status_code=404, detail="TEAM NOT REGISTERED.")
+
     # Return questions WITHOUT the 'correct' field, but with hint_count
     secure_questions = []
     for q in batch.questions:
@@ -179,7 +183,13 @@ async def get_questions(batch_id: int):
             "options": q["options"],
             "hint_count": len(q.get("hints", []))
         })
-    return secure_questions
+    
+    return {
+        "questions": secure_questions,
+        "start_time": team.start_time,
+        "server_time": datetime.utcnow(),
+        "is_completed": team.is_completed
+    }
 
 class AnswerSubmission(BaseModel):
     clerk_id: str
@@ -524,4 +534,94 @@ async def get_leaderboard(batch_id: int):
     # Sort by score (desc) then duration (asc)
     leaderboard.sort(key=lambda x: (-x["score"], x["duration"]))
     return leaderboard
+
+# --- ADMIN COMMAND CENTER ENDPOINTS ---
+
+@app.get("/api/admin/check")
+async def check_admin(clerk_id: str):
+    user = await User.find_one(User.clerk_id == clerk_id)
+    if not user or not user.is_admin:
+        return {"is_admin": False}
+    return {"is_admin": True}
+
+@app.post("/api/admin/promote")
+async def promote_user(clerk_id: str, secret: str):
+    # Secure this with a secret from .env
+    if secret != os.getenv("ADMIN_SECRET", "techtrix_admin_2026"):
+        raise HTTPException(status_code=403, detail="INVALID SECRET.")
+    
+    user = await User.find_one(User.clerk_id == clerk_id)
+    if not user:
+        # Try to find info from Team collection to populate User
+        team = await Team.find_one(Team.clerk_id == clerk_id)
+        user = User(
+            clerk_id=clerk_id,
+            email=f"{clerk_id}@clerk.user", # Placeholder since we don't have it here
+            name=team.leader_name if team else "Admin Operative",
+            is_admin=True
+        )
+        await user.insert()
+    else:
+        user.is_admin = True
+        await user.save()
+        
+    return {"status": "promoted", "clerk_id": clerk_id}
+
+@app.post("/api/admin/login")
+async def admin_login(secret: str):
+    if secret == os.getenv("ADMIN_SECRET", "techtrix_admin_2026"):
+        return {"status": "authorized", "token": "ACCESS_GRANTED_2026"} # Simple token for UI gating
+    raise HTTPException(status_code=401, detail="INVALID ACCESS KEY")
+
+@app.get("/api/admin/teams")
+async def admin_get_teams(clerk_id: str):
+    # Security check
+    admin = await User.find_one(User.clerk_id == clerk_id)
+    if not admin or not admin.is_admin:
+        raise HTTPException(status_code=403, detail="ADMIN ACCESS REQUIRED.")
+        
+    teams = await Team.find_all().to_list()
+    return teams
+
+@app.get("/api/admin/batches")
+async def admin_get_batches(clerk_id: str):
+    admin = await User.find_one(User.clerk_id == clerk_id)
+    if not admin or not admin.is_admin:
+        raise HTTPException(status_code=403, detail="ADMIN ACCESS REQUIRED.")
+    
+    batches = await Batch.find_all().to_list()
+    return batches
+
+@app.post("/api/admin/batches/{batch_id}/toggle")
+async def admin_toggle_batch(batch_id: int, clerk_id: str):
+    admin = await User.find_one(User.clerk_id == clerk_id)
+    if not admin or not admin.is_admin:
+        raise HTTPException(status_code=403, detail="ADMIN ACCESS REQUIRED.")
+    
+    batch = await Batch.find_one(Batch.batch_id == batch_id)
+    if not batch:
+        raise HTTPException(status_code=404, detail="BATCH NOT FOUND.")
+    
+    batch.is_locked = not batch.is_locked
+    await batch.save()
+    return {"batch_id": batch_id, "is_locked": batch.is_locked}
+
+@app.post("/api/admin/teams/{team_clerk_id}/reset")
+async def admin_reset_team(team_clerk_id: str, clerk_id: str, batch_id: int):
+    admin = await User.find_one(User.clerk_id == clerk_id)
+    if not admin or not admin.is_admin:
+        raise HTTPException(status_code=403, detail="ADMIN ACCESS REQUIRED.")
+    
+    team = await Team.find_one(Team.clerk_id == team_clerk_id, Team.batch_id == batch_id)
+    if not team:
+        raise HTTPException(status_code=404, detail="TEAM NOT FOUND.")
+    
+    team.start_time = None
+    team.end_time = None
+    team.is_completed = False
+    team.answers = []
+    team.current_question = 1
+    team.total_score = 0
+    await team.save()
+    return {"status": "reset_successful", "team": team.team_name}
 

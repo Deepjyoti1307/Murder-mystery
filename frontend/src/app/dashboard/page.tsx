@@ -6,6 +6,7 @@ import Image from 'next/image';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import { UserButton, useUser } from "@clerk/nextjs";
+import { API_BASE_URL } from '@/lib/api';
 
 const Scene = dynamic(() => import('../../components/Scene'), { ssr: false });
 
@@ -42,7 +43,7 @@ export default function Dashboard() {
     setIsPending(true);
 
     try {
-      const response = await fetch(`http://localhost:8000/api/batch/${selectedBatch}/enter`, {
+      const response = await fetch(`${API_BASE_URL}/api/batch/${selectedBatch}/enter`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -63,10 +64,10 @@ export default function Dashboard() {
         // Success! Redirect to the story section
         router.push(`/story/${selectedBatch}`);
       } else {
-        const errorMsg = typeof data.detail === 'string' 
-          ? data.detail 
-          : Array.isArray(data.detail) 
-            ? data.detail[0]?.msg 
+        const errorMsg = typeof data.detail === 'string'
+          ? data.detail
+          : Array.isArray(data.detail)
+            ? data.detail[0]?.msg
             : 'AUTHORIZATION DENIED. CHECK YOUR CODE.';
         setError(errorMsg);
       }
@@ -79,7 +80,7 @@ export default function Dashboard() {
 
   return (
     <div className="bg-void-black text-on-surface font-body-md min-h-screen flex flex-col relative overflow-hidden selection:bg-crimson-glare selection:text-white">
-      
+
       {/* Background Scene (Subtle) */}
       <div className="absolute inset-0 z-0 opacity-40 pointer-events-none">
         <Scene />
@@ -129,7 +130,7 @@ export default function Dashboard() {
           {/* Batches Grid */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {/* Batch 1 */}
-            <button 
+            <button
               onClick={() => handleBatchClick(1)}
               className="group relative bg-void-black/60 border-2 border-blood-red/30 p-1 hover:border-crimson-glare transition-all duration-500 shadow-[0_0_20px_rgba(0,0,0,0.3)] text-left"
             >
@@ -151,7 +152,7 @@ export default function Dashboard() {
             </button>
 
             {/* Batch 2 */}
-            <button 
+            <button
               onClick={() => handleBatchClick(2)}
               className="group relative bg-void-black/60 border-2 border-blood-red/30 p-1 hover:border-crimson-glare transition-all duration-500 shadow-[0_0_20px_rgba(0,0,0,0.3)] text-left"
             >
@@ -173,7 +174,7 @@ export default function Dashboard() {
             </button>
 
             {/* Batch 3 */}
-            <button 
+            <button
               onClick={() => handleBatchClick(3)}
               className="group relative bg-void-black/60 border-2 border-blood-red/30 p-1 hover:border-crimson-glare transition-all duration-500 shadow-[0_0_20px_rgba(0,0,0,0.3)] text-left"
             >
@@ -225,7 +226,7 @@ export default function Dashboard() {
                 <label className="block text-xs md:text-sm text-on-surface-variant/60 uppercase tracking-[0.3em] font-bold ml-1">Team Name</label>
                 <input required name="teamName" value={formData.teamName} onChange={handleInputChange} className="w-full bg-black/40 border-2 border-blood-red/30 p-5 font-body-lg text-xl text-white focus:border-crimson-glare outline-none transition-all placeholder:text-white/10 uppercase tracking-widest" placeholder="ENTER IDENTIFIER..." />
               </div>
-              
+
               <div className="grid grid-cols-1 gap-8">
                 <div className="space-y-3">
                   <label className="block text-xs md:text-sm text-on-surface-variant/60 uppercase tracking-[0.3em] font-bold ml-1">Team Leader Name</label>
@@ -245,20 +246,20 @@ export default function Dashboard() {
               <div className="space-y-4 pt-4 border-t border-blood-red/10">
                 <label className="block text-xs md:text-sm text-crimson-glare uppercase tracking-[0.3em] font-bold ml-1">Secret Access Code</label>
                 <input required name="accessCode" value={formData.accessCode} onChange={handleInputChange} type="password" className="w-full bg-blood-red/5 border-2 border-blood-red/50 p-6 font-headline-xl text-4xl text-crimson-glare focus:border-crimson-glare outline-none transition-all placeholder:text-blood-red/20 text-center tracking-[0.5em]" placeholder="********" />
-              <button
-                type="submit"
-                disabled={isPending}
-                className="w-full bg-red-700 hover:bg-red-800 text-white font-bold py-4 rounded transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3 text-xl tracking-widest border border-red-500/50 shadow-[0_0_20px_rgba(185,28,28,0.3)]"
-              >
-                {isPending ? (
-                  <>
-                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    VERIFYING CLEARANCE...
-                  </>
-                ) : (
-                  'AUTHORIZE ACCESS'
-                )}
-              </button>
+                <button
+                  type="submit"
+                  disabled={isPending}
+                  className="w-full bg-red-700 hover:bg-red-800 text-white font-bold py-4 rounded transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3 text-xl tracking-widest border border-red-500/50 shadow-[0_0_20px_rgba(185,28,28,0.3)]"
+                >
+                  {isPending ? (
+                    <>
+                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      VERIFYING CLEARANCE...
+                    </>
+                  ) : (
+                    'AUTHORIZE ACCESS'
+                  )}
+                </button>
               </div>
 
               {error && (

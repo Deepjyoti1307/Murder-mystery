@@ -1,0 +1,10 @@
+Traceback (most recent call last):
+  File "C:\Users\dipud\OneDrive\Desktop\Murder-Mystery\Murder-mystery\backend\main.py", line 457, in init_batches
+    batch.story = story_content
+    ^^^^^^^^^^^
+  File "C:\Users\dipud\Miniconda3\Lib\site-packages\pydantic\main.py", line 1048, in __setattr__
+    elif (setattr_handler := self._setattr_handler(name, value)) is not None:
+                             ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "C:\Users\dipud\Miniconda3\Lib\site-packages\pydantic\main.py", line 1095, in _setattr_handler
+    raise ValueError(f'"{cls.__name__}" object has no field "{name}"')
+ValueError: "Batch" object has no field "story"

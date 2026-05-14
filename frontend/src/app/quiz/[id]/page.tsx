@@ -1,57 +1,58 @@
-'use client';
+"use client";
 
-import React, { useEffect, useState } from 'react';
-import { useParams } from 'next/navigation';
-import { useUser } from "@clerk/nextjs";
-import { ArrowLeft } from 'lucide-react';
-import Link from 'next/link';
-import { API_BASE_URL } from '@/lib/api';
+import React, { useEffect, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
+import { useAuth, useUser } from "@clerk/nextjs";
+import { API_BASE_URL } from "@/lib/api";
 
 interface Question {
   id: number;
   text: string;
   options: string[];
   hint_count: number;
+  question_type: string;
 }
 
 export default function QuizPage() {
   const { id } = useParams();
   const { user } = useUser();
+  const { getToken } = useAuth();
+  const router = useRouter();
   const [questions, setQuestions] = useState<Question[]>([]);
   const [currentIdx, setCurrentIdx] = useState(0);
-  const [selectedOption, setSelectedOption] = useState<string>('');
-  const [feedback, setFeedback] = useState<{ msg: string, isCorrect: boolean } | null>(null);
+  const [answers, setAnswers] = useState<Record<number, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
   const [qHints, setQHints] = useState<string[]>([]);
   const [pendingHintIndex, setPendingHintIndex] = useState<number | null>(null);
-  const [timeLeft, setTimeLeft] = useState<number | null>(null); // in seconds
+  const [timeLeft, setTimeLeft] = useState<number | null>(null);
+  const [autoSubmitted, setAutoSubmitted] = useState(false);
 
-  const timestamp = new Date().getTime();
+  const getAuthHeaders = async () => {
+    const token = await getToken();
+    return {
+      "Content-Type": "application/json",
+      Authorization: token ? `Bearer ${token}` : "",
+      "X-Dev-Clerk-Id": token ? "" : user?.id || "",
+    };
+  };
 
   useEffect(() => {
     const initQuiz = async () => {
       if (!id || !user) return;
       try {
-        const timestamp = new Date().getTime();
-        const qResponse = await fetch(`${API_BASE_URL}/api/quiz/${id}/questions?clerk_id=${user.id}&t=${timestamp}`, { cache: 'no-store' });
+        const headers = await getAuthHeaders();
+        const qResponse = await fetch(`${API_BASE_URL}/api/quiz/${id}/questions`, { headers, cache: "no-store" });
         const data = await qResponse.json();
 
         if (qResponse.ok) {
           setQuestions(data.questions);
-
           if (data.is_completed) {
-            window.location.href = `/results/${id}`;
+            router.replace(`/results/${id}`);
             return;
           }
-
-          // Calculate initial time left
-          if (data.start_time) {
-            const start = new Date(data.start_time).getTime();
-            const now = new Date(data.server_time).getTime();
-            const elapsed = Math.floor((now - start) / 1000);
-            const limit = 90 * 60; // 90 minutes
-            setTimeLeft(Math.max(0, limit - elapsed));
+          if (typeof data.time_left === "number") {
+            setTimeLeft(data.time_left);
           }
         }
       } catch (err) {
@@ -61,100 +62,99 @@ export default function QuizPage() {
       }
     };
     initQuiz();
-  }, [id, user]);
+  }, [id, user, getToken, router]);
 
-  // Timer effect
   useEffect(() => {
-    if (timeLeft === null || timeLeft <= 0) {
-      if (timeLeft === 0) handleFinish();
+    if (timeLeft === null) return;
+    if (timeLeft <= 0) {
+      if (!autoSubmitted) {
+        setAutoSubmitted(true);
+        handleFinalSubmit(true);
+      }
       return;
     }
-
     const timer = setInterval(() => {
-      setTimeLeft(prev => (prev !== null ? prev - 1 : null));
+      setTimeLeft((prev) => (prev !== null ? Math.max(0, prev - 1) : null));
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [timeLeft]);
+  }, [timeLeft, autoSubmitted]);
 
   useEffect(() => {
     const fetchHints = async () => {
       if (!user || !questions[currentIdx]) return;
       try {
-        const hResponse = await fetch(`${API_BASE_URL}/api/quiz/${id}/hints/${questions[currentIdx].id}?clerk_id=${user.id}&t=${new Date().getTime()}`, { cache: 'no-store' });
+        const headers = await getAuthHeaders();
+        const hResponse = await fetch(`${API_BASE_URL}/api/quiz/${id}/hints/${questions[currentIdx].id}`, { headers, cache: "no-store" });
         const hData = await hResponse.json();
         if (hResponse.ok) setQHints(hData.hints || []);
-      } catch (err) { }
+      } catch (err) {
+        setQHints([]);
+      }
     };
     fetchHints();
-    setSelectedOption('');
-    setFeedback(null);
-  }, [currentIdx, user, questions]);
+  }, [currentIdx, user, questions, id, getToken]);
 
-  const handleSubmit = async () => {
-    if (!selectedOption || !user) return;
-    setIsSubmitting(true);
-    setFeedback(null);
+  const currentQ = questions[currentIdx];
+  const selectedOption = currentQ ? answers[currentQ.id] || "" : "";
+  const totalHintsAvailable = currentQ?.hint_count || 0;
 
-    let answerPayload = selectedOption;
-    if (questions[currentIdx].options && questions[currentIdx].options.length > 0) {
-      answerPayload = selectedOption.match(/\(([A-D])\)/)?.[1] || '';
-    }
-
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/quiz/${id}/submit`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          clerk_id: user.id,
-          question_id: questions[currentIdx].id,
-          answer: answerPayload
-        })
-      });
-
-      const data = await response.json();
-      setFeedback({ msg: data.message, isCorrect: data.is_correct });
-    } catch (err) {
-      setFeedback({ msg: "TRANSMISSION ERROR", isCorrect: false });
-    } finally {
-      setIsSubmitting(false);
-    }
+  const handleSelect = (value: string) => {
+    if (!currentQ) return;
+    setAnswers((prev) => ({ ...prev, [currentQ.id]: value }));
   };
 
   const handleRequestHint = async () => {
-    if (!user || pendingHintIndex === null) return;
+    if (!user || pendingHintIndex === null || !currentQ) return;
     try {
+      const headers = await getAuthHeaders();
       const response = await fetch(`${API_BASE_URL}/api/quiz/${id}/hints/reveal`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: "POST",
+        headers,
         body: JSON.stringify({
           clerk_id: user.id,
-          question_id: questions[currentIdx].id,
-          hint_index: pendingHintIndex
-        })
+          question_id: currentQ.id,
+          hint_index: pendingHintIndex,
+        }),
       });
       const data = await response.json();
       if (response.ok) {
-        setQHints(prev => [...prev, data.hint]);
+        setQHints((prev) => [...prev, data.hint]);
         setPendingHintIndex(null);
       }
-    } catch (err) { }
+    } catch (err) {
+      setPendingHintIndex(null);
+    }
   };
 
-  const handleFinish = async () => {
-    if (!user) return;
+  const handleFinalSubmit = async (isAuto = false) => {
+    if (!user || !currentQ || isSubmitting) return;
+    if (!isAuto) {
+      const confirmSubmit = window.confirm("SUBMIT ALL ANSWERS NOW?");
+      if (!confirmSubmit) return;
+    }
+
     setIsSubmitting(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/api/quiz/${id}/finish`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ clerk_id: user.id })
+      const headers = await getAuthHeaders();
+      const payload = {
+        clerk_id: user.id,
+        answers: questions.map((q) => ({
+          question_id: q.id,
+          answer: answers[q.id] || "",
+        })),
+      };
+      const response = await fetch(`${API_BASE_URL}/api/quiz/${id}/submit`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(payload),
       });
-      if (response.ok) {
-        window.location.href = `/results/${id}`;
+
+      if (response.ok || response.status === 409) {
+        router.replace(`/results/${id}`);
       }
     } catch (err) {
-      console.error("FINISH ERROR");
+      console.error("SUBMIT ERROR");
     } finally {
       setIsSubmitting(false);
     }
@@ -172,24 +172,24 @@ export default function QuizPage() {
     }
   };
 
-  if (loading) return (
-    <div className="bg-black min-h-screen flex items-center justify-center font-mono text-blood-red tracking-widest uppercase">
-      INITIALIZING TERMINAL...
-    </div>
-  );
+  if (loading) {
+    return (
+      <div className="bg-black min-h-screen flex items-center justify-center font-mono text-blood-red tracking-widest uppercase">
+        INITIALIZING TERMINAL...
+      </div>
+    );
+  }
 
-  if (questions.length === 0) return (
-    <div className="bg-black min-h-screen flex items-center justify-center font-mono text-on-surface-variant uppercase">
-      NO EVIDENCE DATA LOADED.
-    </div>
-  );
-
-  const currentQ = questions[currentIdx];
-  const totalHintsAvailable = currentQ.hint_count || 0;
+  if (questions.length === 0 || !currentQ) {
+    return (
+      <div className="bg-black min-h-screen flex items-center justify-center font-mono text-on-surface-variant uppercase">
+        NO EVIDENCE DATA LOADED.
+      </div>
+    );
+  }
 
   return (
     <div className="bg-black min-h-screen text-on-surface font-mono selection:bg-blood-red/40 overflow-hidden flex flex-col">
-
       <div className="bg-zinc-900 border-b border-blood-red/30 p-4 flex flex-col md:flex-row justify-between items-center gap-2 shadow-[0_2px_20px_rgba(139,0,0,0.2)]">
         <div className="flex items-center gap-2 md:gap-4 text-[10px] md:text-xs">
           <span className="text-blood-red font-bold animate-pulse shrink-0">● SYSTEM LIVE</span>
@@ -197,29 +197,27 @@ export default function QuizPage() {
           <span className="text-on-surface-variant/60 tracking-[0.2em] uppercase hidden sm:inline">Evidence Processor V.2.0</span>
           <div className="w-[1px] h-4 bg-white/10 hidden sm:block" />
           {timeLeft !== null && (
-            <div className={`font-bold tracking-widest whitespace-nowrap ${timeLeft < 300 ? 'text-blood-red animate-pulse' : 'text-white'}`}>
-              TIME: {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
+            <div className={`font-bold tracking-widest whitespace-nowrap ${timeLeft < 300 ? "text-blood-red animate-pulse" : "text-white"}`}>
+              TIME: {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, "0")}
             </div>
           )}
         </div>
         <div className="text-[10px] md:text-xs text-blood-red font-bold tracking-widest uppercase">
-          OPERATIVE // {user?.firstName || 'UNKNOWN'}
+          OPERATIVE // {user?.firstName || "UNKNOWN"}
         </div>
       </div>
 
       <main className="flex-1 overflow-y-auto p-4 md:p-12 flex flex-col items-center">
         <div className="max-w-3xl w-full space-y-6 md:space-y-8">
-
           <div className="flex items-center gap-1.5 md:gap-2 mb-4 md:mb-8">
             {questions.map((_, idx) => (
               <div
                 key={idx}
-                className={`flex-1 h-1 transition-all duration-500 ${idx === currentIdx ? 'bg-blood-red shadow-[0_0_10px_rgba(220,20,60,0.8)]' : idx < currentIdx ? 'bg-blood-red/40' : 'bg-white/5'}`}
+                className={`flex-1 h-1 transition-all duration-500 ${idx === currentIdx ? "bg-blood-red shadow-[0_0_10px_rgba(220,20,60,0.8)]" : idx < currentIdx ? "bg-blood-red/40" : "bg-white/5"}`}
               />
             ))}
           </div>
 
-          {/* Question & Hint Buttons Header */}
           <div className="space-y-6">
             <div className="flex flex-col md:flex-row justify-between items-start gap-4 md:gap-6">
               <div className="flex-1 space-y-4">
@@ -229,7 +227,6 @@ export default function QuizPage() {
                 </h2>
               </div>
 
-              {/* Tactical Hint Buttons */}
               <div className="flex flex-row md:flex-col gap-3 pt-2 md:pt-6 min-w-[60px] w-full md:w-auto overflow-x-auto pb-2 md:pb-0">
                 {Array.from({ length: totalHintsAvailable }).map((_, idx) => {
                   const hintNum = idx + 1;
@@ -239,7 +236,7 @@ export default function QuizPage() {
                       <button
                         onClick={() => !isRevealed && setPendingHintIndex(hintNum)}
                         disabled={isRevealed}
-                        className={`w-14 h-14 border-2 flex items-center justify-center text-sm font-bold transition-all ${isRevealed ? 'bg-blood-red border-blood-red text-white shadow-[0_0_15px_rgba(220,20,60,0.4)]' : 'border-white/20 text-white/40 hover:border-blood-red hover:text-blood-red'}`}
+                        className={`w-14 h-14 border-2 flex items-center justify-center text-sm font-bold transition-all ${isRevealed ? "bg-blood-red border-blood-red text-white shadow-[0_0_15px_rgba(220,20,60,0.4)]" : "border-white/20 text-white/40 hover:border-blood-red hover:text-blood-red"}`}
                       >
                         H{hintNum}
                       </button>
@@ -254,13 +251,12 @@ export default function QuizPage() {
                         </div>
                       )}
                     </div>
-                  )
+                  );
                 })}
               </div>
             </div>
           </div>
 
-          {/* Revealed Hint Display */}
           {qHints.length > 0 && (
             <div className="space-y-3 animate-slideUp">
               {qHints.map((hint, idx) => (
@@ -272,17 +268,16 @@ export default function QuizPage() {
             </div>
           )}
 
-          {/* Options / Terminal Input */}
           <div className="grid grid-cols-1 gap-4 pt-4">
             {currentQ.options && currentQ.options.length > 0 ? (
               currentQ.options.map((option, idx) => (
                 <button
                   key={idx}
-                  onClick={() => setSelectedOption(option)}
-                  className={`p-6 border-2 text-left transition-all group relative overflow-hidden ${selectedOption === option ? 'bg-blood-red/10 border-blood-red' : 'bg-white/5 border-white/10 hover:border-white/30'}`}
+                  onClick={() => handleSelect(option)}
+                  className={`p-6 border-2 text-left transition-all group relative overflow-hidden ${selectedOption === option ? "bg-blood-red/10 border-blood-red" : "bg-white/5 border-white/10 hover:border-white/30"}`}
                 >
-                  <div className={`absolute left-0 top-0 bottom-0 w-1 bg-blood-red transition-all duration-300 ${selectedOption === option ? 'opacity-100' : 'opacity-0'}`} />
-                  <span className={`text-lg uppercase tracking-widest transition-colors ${selectedOption === option ? 'text-white' : 'text-on-surface-variant group-hover:text-white'}`}>
+                  <div className={`absolute left-0 top-0 bottom-0 w-1 bg-blood-red transition-all duration-300 ${selectedOption === option ? "opacity-100" : "opacity-0"}`} />
+                  <span className={`text-lg uppercase tracking-widest transition-colors ${selectedOption === option ? "text-white" : "text-on-surface-variant group-hover:text-white"}`}>
                     {option}
                   </span>
                 </button>
@@ -296,9 +291,9 @@ export default function QuizPage() {
                   placeholder="TYPE THE DECODED MESSAGE HERE..."
                   value={selectedOption}
                   autoFocus
-                  onChange={(e) => setSelectedOption(e.target.value)}
+                  onChange={(e) => handleSelect(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter') handleSubmit();
+                    if (e.key === "Enter") handleFinalSubmit();
                   }}
                 />
                 <div className="flex justify-between text-[8px] text-blood-red/40 font-bold px-2">
@@ -309,53 +304,29 @@ export default function QuizPage() {
             )}
           </div>
 
-          <div className="flex flex-col items-center gap-8 pt-8">
-            {currentIdx === questions.length - 1 ? (
-              <button
-                onClick={handleFinish}
-                disabled={isSubmitting}
-                className="w-full max-w-sm bg-green-700 hover:bg-green-600 text-white py-5 font-bold uppercase tracking-[0.3em] shadow-[0_0_30_rgba(34,197,94,0.3)] transition-all active:scale-95 text-lg"
-              >
-                {isSubmitting ? 'UPLOADING...' : 'FINISH INVESTIGATION'}
-              </button>
-            ) : (
-              <button
-                onClick={handleSubmit}
-                disabled={!selectedOption || isSubmitting}
-                className="w-full max-w-sm bg-blood-red hover:bg-crimson-glare text-white py-5 font-bold uppercase tracking-[0.3em] shadow-[0_0_30_rgba(139,0,0,0.3)] disabled:opacity-30 transition-all active:scale-95 text-lg"
-              >
-                {isSubmitting ? 'PROCESSING...' : 'SUBMIT ANALYSIS'}
-              </button>
-            )}
-
-            {feedback && (
-              <div className={`text-center font-bold tracking-widest uppercase animate-slideUp ${feedback.isCorrect ? 'text-green-500 drop-shadow-[0_0_10px_rgba(34,197,94,0.5)]' : 'text-blood-red animate-shake'}`}>
-                {feedback.msg}
-              </div>
-            )}
-          </div>
-
-          {/* Navigation */}
-          <div className="flex justify-between items-center pt-12 border-t border-white/10 mt-12 pb-12">
+          <div className="flex flex-col md:flex-row gap-4 pt-6">
             <button
               onClick={prevQuestion}
               disabled={currentIdx === 0}
-              className="px-8 py-4 bg-zinc-900 border border-white/10 text-on-surface-variant hover:text-white hover:border-white/30 uppercase tracking-[0.2em] font-bold flex items-center gap-3 transition-all disabled:opacity-5 active:scale-95 text-sm"
+              className="flex-1 bg-white/5 border border-white/10 text-white py-4 uppercase tracking-widest text-xs hover:bg-white/10 disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              ← PREVIOUS
+              Previous
             </button>
-            <div className="hidden md:block text-[10px] text-white/10 tracking-[0.5em] uppercase font-bold">
-              SECURE DATA CHANNEL
-            </div>
             <button
               onClick={nextQuestion}
               disabled={currentIdx === questions.length - 1}
-              className="px-8 py-4 bg-zinc-900 border border-blood-red/40 text-blood-red hover:text-white hover:bg-blood-red hover:border-blood-red uppercase tracking-[0.2em] font-bold flex items-center gap-3 transition-all disabled:opacity-5 active:scale-95 text-sm shadow-[0_0_20px_rgba(139,0,0,0.1)]"
+              className="flex-1 bg-white/5 border border-white/10 text-white py-4 uppercase tracking-widest text-xs hover:bg-white/10 disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              NEXT TRACK →
+              Next
+            </button>
+            <button
+              onClick={() => handleFinalSubmit(false)}
+              disabled={isSubmitting}
+              className="flex-1 bg-blood-red text-white py-4 uppercase tracking-widest text-xs hover:bg-crimson-glare disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {isSubmitting ? "Submitting..." : "Submit Answers"}
             </button>
           </div>
-
         </div>
       </main>
 

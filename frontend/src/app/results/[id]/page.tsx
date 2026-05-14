@@ -1,11 +1,11 @@
-'use client';
+"use client";
 
-import React, { useEffect, useState } from 'react';
-import { useParams } from 'next/navigation';
-import { useUser } from "@clerk/nextjs";
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
-import { Trophy, Clock, Target, AlertTriangle } from 'lucide-react';
-import { API_BASE_URL } from '@/lib/api';
+import React, { useEffect, useState } from "react";
+import { useParams } from "next/navigation";
+import { useAuth, useUser } from "@clerk/nextjs";
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
+import { Trophy, Clock, Target, AlertTriangle } from "lucide-react";
+import { API_BASE_URL } from "@/lib/api";
 
 interface ResultData {
   team_name: string;
@@ -28,17 +28,29 @@ interface LeaderboardEntry {
 export default function ResultsPage() {
   const { id } = useParams();
   const { user } = useUser();
+  const { getToken } = useAuth();
   const [results, setResults] = useState<ResultData | null>(null);
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [rankLabel, setRankLabel] = useState<string | null>(null);
+
+  const getAuthHeaders = async () => {
+    const token = await getToken();
+    return {
+      "Content-Type": "application/json",
+      Authorization: token ? `Bearer ${token}` : "",
+      "X-Dev-Clerk-Id": token ? "" : user?.id || "",
+    };
+  };
 
   useEffect(() => {
     const fetchData = async () => {
       if (!id || !user) return;
       try {
+        const headers = await getAuthHeaders();
         const [resResponse, leadResponse] = await Promise.all([
-          fetch(`${API_BASE_URL}/api/quiz/${id}/results?clerk_id=${user.id}`),
-          fetch(`${API_BASE_URL}/api/quiz/${id}/leaderboard`)
+          fetch(`${API_BASE_URL}/api/quiz/${id}/results`, { headers }),
+          fetch(`${API_BASE_URL}/api/quiz/${id}/leaderboard`, { headers })
         ]);
 
         if (resResponse.ok) setResults(await resResponse.json());
@@ -50,7 +62,17 @@ export default function ResultsPage() {
       }
     };
     fetchData();
-  }, [id, user]);
+    const interval = setInterval(fetchData, 5000);
+    return () => clearInterval(interval);
+  }, [id, user, getToken]);
+
+  useEffect(() => {
+    if (!results || leaderboard.length === 0) return;
+    const idx = leaderboard.findIndex((entry) => entry.team_name === results.team_name);
+    if (idx >= 0) {
+      setRankLabel(`#${idx + 1} out of ${leaderboard.length} participants`);
+    }
+  }, [results, leaderboard]);
 
   if (loading) return (
     <div className="bg-black min-h-screen flex items-center justify-center font-mono text-blood-red tracking-widest uppercase animate-pulse">
@@ -83,8 +105,13 @@ export default function ResultsPage() {
             FINAL PERFORMANCE LOG
           </h1>
           <p className="text-on-surface-variant/60 tracking-widest text-xs">
-            TEAM: {results?.team_name || 'UNKNOWN OPERATIVES'} // BATCH ID: {id}
+            TEAM: {results?.team_name || "UNKNOWN OPERATIVES"} // BATCH ID: {id}
           </p>
+          {rankLabel && (
+            <div className="text-[10px] text-blood-red font-bold tracking-[0.4em] uppercase">
+              {rankLabel}
+            </div>
+          )}
         </div>
 
         {/* Stats Grid */}

@@ -1,35 +1,46 @@
-'use client';
+"use client";
 
-import React, { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
-import { useUser } from "@clerk/nextjs";
-import Link from 'next/link';
-import { API_BASE_URL } from '@/lib/api';
+import React, { useEffect, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
+import { useAuth, useUser } from "@clerk/nextjs";
+import { API_BASE_URL } from "@/lib/api";
+
+const QUIZ_LIMIT_SECONDS = 90 * 60;
 
 export default function StoryPage() {
   const { id } = useParams();
   const { user } = useUser();
+  const { getToken } = useAuth();
   const router = useRouter();
-  const [timeLeft, setTimeLeft] = useState(5400); // 90 minutes in seconds
-  const [story, setStory] = useState<string>('');
+  const [timeLeft, setTimeLeft] = useState<number | null>(null);
+  const [story, setStory] = useState<string>("");
   const [loading, setLoading] = useState(true);
 
+  const getAuthHeaders = async () => {
+    const token = await getToken();
+    return {
+      "Content-Type": "application/json",
+      Authorization: token ? `Bearer ${token}` : "",
+      "X-Dev-Clerk-Id": token ? "" : user?.id || "",
+    };
+  };
+
   useEffect(() => {
-    if (!user) return;
+    if (!user || !id) return;
 
     const fetchStory = async () => {
       try {
-        // Start the timer on backend
-        await fetch(`${API_BASE_URL}/api/batch/${id}/start`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ clerk_id: user?.id })
-        });
-
-        const response = await fetch(`${API_BASE_URL}/api/story/${id}`);
+        const headers = await getAuthHeaders();
+        const response = await fetch(`${API_BASE_URL}/api/story/${id}`, { headers });
         const data = await response.json();
         if (response.ok) {
           setStory(data.content);
+          if (data.entry_timestamp && data.server_time) {
+            const entry = new Date(data.entry_timestamp).getTime();
+            const server = new Date(data.server_time).getTime();
+            const elapsed = Math.floor((server - entry) / 1000);
+            setTimeLeft(Math.max(0, QUIZ_LIMIT_SECONDS - elapsed));
+          }
         }
       } catch (err) {
         console.error("Failed to load dossier.");
@@ -39,15 +50,23 @@ export default function StoryPage() {
     };
 
     fetchStory();
+  }, [id, user, getToken]);
 
+  useEffect(() => {
+    if (timeLeft === null) return;
+    if (timeLeft <= 0) {
+      router.replace(`/quiz/${id}`);
+      return;
+    }
     const timer = setInterval(() => {
-      setTimeLeft((prev) => (prev > 0 ? prev - 1 : 0));
+      setTimeLeft((prev) => (prev !== null ? Math.max(0, prev - 1) : null));
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [id, user]);
+  }, [timeLeft, router, id]);
 
-  const formatTime = (seconds: number) => {
+  const formatTime = (seconds: number | null) => {
+    if (seconds === null) return "--:--:--";
     const h = Math.floor(seconds / 3600);
     const m = Math.floor((seconds % 3600) / 60);
     const s = seconds % 60;
@@ -55,7 +74,7 @@ export default function StoryPage() {
   };
 
   const openQuiz = () => {
-    window.open(`/quiz/${id}`, '_blank');
+    router.push(`/quiz/${id}`);
   };
 
   if (loading) return (
@@ -107,8 +126,20 @@ export default function StoryPage() {
             <h2 className="font-headline-xl text-2xl md:text-4xl text-on-surface tracking-[0.2em] uppercase">Eyes Only</h2>
           </div>
 
-          <div className="font-body-lg text-on-surface-variant/80 space-y-8 whitespace-pre-wrap first-letter:text-7xl first-letter:font-bold first-letter:text-blood-red first-letter:mr-3 first-letter:float-left">
+          <div
+            onContextMenu={(event) => event.preventDefault()}
+            className="font-body-lg text-on-surface-variant/80 space-y-8 whitespace-pre-wrap first-letter:text-7xl first-letter:font-bold first-letter:text-blood-red first-letter:mr-3 first-letter:float-left"
+          >
             {story}
+          </div>
+
+          <div className="mt-16 flex justify-center">
+            <button
+              onClick={openQuiz}
+              className="bg-blood-red hover:bg-crimson-glare text-white px-10 py-4 font-headline-xl text-sm uppercase tracking-widest transition-all shadow-[0_0_15px_rgba(139,0,0,0.4)] active:scale-95"
+            >
+              Proceed to Questions →
+            </button>
           </div>
 
           <div className="mt-20 pt-8 border-t border-blood-red/10 flex justify-between items-end opacity-40">

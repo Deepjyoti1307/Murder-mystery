@@ -1,78 +1,185 @@
-'use client';
+"use client";
 
-import React, { useState } from 'react';
-import Link from 'next/link';
-import Image from 'next/image';
-import dynamic from 'next/dynamic';
-import { useRouter } from 'next/navigation';
-import { UserButton, useUser } from "@clerk/nextjs";
-import { API_BASE_URL } from '@/lib/api';
+import React, { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import dynamic from "next/dynamic";
+import { useRouter } from "next/navigation";
+import { UserButton, useAuth, useUser } from "@clerk/nextjs";
+import { API_BASE_URL } from "@/lib/api";
 
-const Scene = dynamic(() => import('../../components/Scene'), { ssr: false });
+const Scene = dynamic(() => import("../../components/Scene"), { ssr: false });
+
+type BatchStatus = {
+  batch_id: number;
+  is_locked: boolean;
+  status: "not_started" | "in_progress" | "completed";
+  entry_timestamp: string | null;
+  server_time: string;
+};
+
+const QUIZ_LIMIT_SECONDS = 90 * 60;
 
 export default function Dashboard() {
   const { user } = useUser();
+  const { getToken } = useAuth();
   const router = useRouter();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedBatch, setSelectedBatch] = useState<number | null>(null);
+  const [assignedBatch, setAssignedBatch] = useState<number | null>(null);
+  const [batchStatus, setBatchStatus] = useState<Record<number, BatchStatus>>({});
+  const [timeLeft, setTimeLeft] = useState<number | null>(null);
   const [formData, setFormData] = useState({
-    teamName: '',
-    leaderName: '',
-    phoneNumber: '',
-    collegeName: '',
-    accessCode: ''
+    teamName: "",
+    leaderName: "",
+    phoneNumber: "",
+    collegeName: "",
+    accessCode: "",
   });
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
   const [isPending, setIsPending] = useState(false);
 
-  const CORRECT_CODE = "CRIMSON2026"; // You can change this secret code
+  const batches = useMemo(() => [1, 2, 3], []);
+
+  const getAuthHeaders = async () => {
+    const token = await getToken();
+    return {
+      "Content-Type": "application/json",
+      Authorization: token ? `Bearer ${token}` : "",
+      "X-Dev-Clerk-Id": token ? "" : user?.id || "",
+    };
+  };
+
+  useEffect(() => {
+    if (!user) return;
+
+    const registerAndLoad = async () => {
+      try {
+        const headers = await getAuthHeaders();
+        await fetch(`${API_BASE_URL}/api/user/register`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            clerk_id: user.id,
+            email: user.primaryEmailAddress?.emailAddress || "",
+            name: user.fullName || user.firstName || "UNKNOWN",
+          }),
+        });
+
+        const meRes = await fetch(`${API_BASE_URL}/api/user/me`, {
+          headers,
+        });
+        if (meRes.ok) {
+          const me = await meRes.json();
+          setAssignedBatch(me.assigned_batch ? Number(me.assigned_batch) : null);
+        }
+
+        const statusResponses = await Promise.all(
+          batches.map((batchId) =>
+            fetch(`${API_BASE_URL}/api/batch/${batchId}/status`, { headers })
+          )
+        );
+        const statusData = await Promise.all(statusResponses.map((res) => res.json()));
+        const nextStatus: Record<number, BatchStatus> = {};
+        statusData.forEach((status) => {
+          if (status.batch_id) nextStatus[status.batch_id] = status;
+        });
+        setBatchStatus(nextStatus);
+      } catch (err) {
+        setError("COMMUNICATION FAILURE. TERMINAL OFFLINE.");
+      }
+    };
+
+    registerAndLoad();
+    const interval = setInterval(registerAndLoad, 5000);
+    return () => clearInterval(interval);
+  }, [user, batches, getToken]);
+
+  useEffect(() => {
+    const assignedStatus = assignedBatch ? batchStatus[assignedBatch] : null;
+    if (!assignedStatus || !assignedStatus.entry_timestamp) {
+      setTimeLeft(null);
+      return;
+    }
+    const serverTime = new Date(assignedStatus.server_time).getTime();
+    const entryTime = new Date(assignedStatus.entry_timestamp).getTime();
+    const elapsed = Math.floor((serverTime - entryTime) / 1000);
+    const initial = Math.max(0, QUIZ_LIMIT_SECONDS - elapsed);
+    setTimeLeft(initial);
+  }, [assignedBatch, batchStatus]);
+
+  useEffect(() => {
+    if (timeLeft === null) return;
+    if (timeLeft <= 0) return;
+    const timer = setInterval(() => {
+      setTimeLeft((prev) => (prev !== null ? Math.max(0, prev - 1) : null));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [timeLeft]);
+
+  const formatTime = (seconds: number | null) => {
+    if (seconds === null) return "--:--:--";
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = seconds % 60;
+    return `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
+  };
 
   const handleBatchClick = (batchNumber: number) => {
+    const status = batchStatus[batchNumber];
+    if (!status || status.is_locked) return;
+    if (assignedBatch && assignedBatch !== batchNumber) return;
+
+    if (status.status === "in_progress") {
+      router.push(`/story/${batchNumber}`);
+      return;
+    }
+    if (status.status === "completed") {
+      router.push(`/results/${batchNumber}`);
+      return;
+    }
     setSelectedBatch(batchNumber);
     setIsModalOpen(true);
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
-    setError('');
+    setError("");
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
+    setError("");
     setIsPending(true);
 
     try {
+      const headers = await getAuthHeaders();
       const response = await fetch(`${API_BASE_URL}/api/batch/${selectedBatch}/enter`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        method: "POST",
+        headers,
         body: JSON.stringify({
           team_name: formData.teamName,
           leader_name: formData.leaderName,
           phone_number: formData.phoneNumber,
           college_name: formData.collegeName,
           access_code: formData.accessCode,
-          clerk_id: user?.id
+          clerk_id: user?.id,
         }),
       });
 
       const data = await response.json();
 
       if (response.ok) {
-        // Success! Redirect to the story section
         router.push(`/story/${selectedBatch}`);
       } else {
-        const errorMsg = typeof data.detail === 'string'
+        const errorMsg = typeof data.detail === "string"
           ? data.detail
           : Array.isArray(data.detail)
             ? data.detail[0]?.msg
-            : 'AUTHORIZATION DENIED. CHECK YOUR CODE.';
+            : "AUTHORIZATION DENIED. CHECK YOUR CODE.";
         setError(errorMsg);
       }
     } catch (err) {
-      setError('COMMUNICATION FAILURE. TERMINAL OFFLINE.');
+      setError("COMMUNICATION FAILURE. TERMINAL OFFLINE.");
     } finally {
       setIsPending(false);
     }
@@ -103,12 +210,22 @@ export default function Dashboard() {
               <p className="text-crimson-glare font-body-sm uppercase tracking-widest font-bold">
                 Operative {user?.firstName?.toUpperCase() || 'UNKNOWN'}
               </p>
+              <div className="h-4 w-[1px] bg-blood-red/20"></div>
+              <p className="text-on-surface-variant/40 font-body-sm uppercase tracking-widest">
+                {user?.primaryEmailAddress?.emailAddress || "NO EMAIL"}
+              </p>
+              <div className="h-4 w-[1px] bg-blood-red/20"></div>
+              <p className="text-crimson-glare font-body-sm uppercase tracking-widest font-bold">
+                Batch {assignedBatch || "UNASSIGNED"}
+              </p>
             </div>
           </div>
 
           <div className="flex items-center gap-8">
             <div className="flex items-center gap-6">
-              <span className="font-headline-md text-crimson-glare animate-pulse tracking-widest">T-MINUS: 04:12:59</span>
+              <span className="font-headline-md text-crimson-glare animate-pulse tracking-widest">
+                T-MINUS: {formatTime(timeLeft)}
+              </span>
               <div className="h-8 w-[2px] bg-blood-red/20"></div>
               <UserButton appearance={{ elements: { userButtonAvatarBox: "w-10 h-10 border-2 border-blood-red shadow-[0_0_10px_rgba(139,0,0,0.5)]" } }} />
             </div>
@@ -129,71 +246,43 @@ export default function Dashboard() {
 
           {/* Batches Grid */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {/* Batch 1 */}
-            <button
-              onClick={() => handleBatchClick(1)}
-              className="group relative bg-void-black/60 border-2 border-blood-red/30 p-1 hover:border-crimson-glare transition-all duration-500 shadow-[0_0_20px_rgba(0,0,0,0.3)] text-left"
-            >
-              <div className="absolute top-4 right-4 bg-blood-red/10 border border-blood-red/40 text-blood-red text-[10px] px-3 py-1 uppercase font-bold tracking-widest">
-                Locked
-              </div>
-              <div className="p-8 space-y-8 flex flex-col items-center">
-                <h3 className="font-headline-xl text-3xl text-on-surface uppercase tracking-widest w-full">Batch 1</h3>
-                <div className="relative py-12">
-                  <span className="material-symbols-outlined text-8xl text-on-surface-variant/20 group-hover:text-blood-red/40 transition-colors duration-500">lock</span>
-                </div>
-                <p className="font-body-md text-on-surface-variant/60 text-center leading-relaxed">
-                  Initial evidence collection regarding the Sector 4 anomaly. Contains crime scene photography, witness transcripts, and preliminary autopsy reports.
-                </p>
-                <div className="w-full bg-blood-red/20 border-2 border-blood-red group-hover:bg-blood-red text-white py-4 font-headline-xl text-xl uppercase tracking-widest transition-all duration-300 text-center">
-                  Unlock Access
-                </div>
-              </div>
-            </button>
+            {batches.map((batchNumber) => {
+              const status = batchStatus[batchNumber];
+              const isLocked = status?.is_locked ?? true;
+              const isAssigned = !assignedBatch || assignedBatch === batchNumber;
+              const isDisabled = isLocked || !isAssigned;
+              const progress = status?.status || "not_started";
 
-            {/* Batch 2 */}
-            <button
-              onClick={() => handleBatchClick(2)}
-              className="group relative bg-void-black/60 border-2 border-blood-red/30 p-1 hover:border-crimson-glare transition-all duration-500 shadow-[0_0_20px_rgba(0,0,0,0.3)] text-left"
-            >
-              <div className="absolute top-4 right-4 bg-blood-red/10 border border-blood-red/40 text-blood-red text-[10px] px-3 py-1 uppercase font-bold tracking-widest">
-                Locked
-              </div>
-              <div className="p-8 space-y-8 flex flex-col items-center">
-                <h3 className="font-headline-xl text-3xl text-on-surface uppercase tracking-widest w-full text-center">Batch 2</h3>
-                <div className="relative py-12 text-center w-full">
-                  <span className="material-symbols-outlined text-8xl text-on-surface-variant/20 group-hover:text-blood-red/40 transition-colors duration-500">lock</span>
-                </div>
-                <p className="font-body-md text-on-surface-variant/60 text-center leading-relaxed h-20">
-                  Secondary evidence compartment. Access restricted pending completion of Batch 1 analysis.
-                </p>
-                <div className="w-full bg-blood-red/20 border-2 border-blood-red group-hover:bg-blood-red text-white py-4 font-headline-xl text-xl uppercase tracking-widest transition-all duration-300 text-center">
-                  Unlock Access
-                </div>
-              </div>
-            </button>
-
-            {/* Batch 3 */}
-            <button
-              onClick={() => handleBatchClick(3)}
-              className="group relative bg-void-black/60 border-2 border-blood-red/30 p-1 hover:border-crimson-glare transition-all duration-500 shadow-[0_0_20px_rgba(0,0,0,0.3)] text-left"
-            >
-              <div className="absolute top-4 right-4 bg-blood-red/10 border border-blood-red/40 text-blood-red text-[10px] px-3 py-1 uppercase font-bold tracking-widest">
-                Locked
-              </div>
-              <div className="p-8 space-y-8 flex flex-col items-center">
-                <h3 className="font-headline-xl text-3xl text-on-surface uppercase tracking-widest w-full text-center">Batch 3</h3>
-                <div className="relative py-12 text-center w-full">
-                  <span className="material-symbols-outlined text-8xl text-on-surface-variant/20 group-hover:text-blood-red/40 transition-colors duration-500">lock</span>
-                </div>
-                <p className="font-body-md text-on-surface-variant/60 text-center leading-relaxed h-20">
-                  Final evidence repository. High-level encryption applied. Requires maximum clearance for access.
-                </p>
-                <div className="w-full bg-blood-red/20 border-2 border-blood-red group-hover:bg-blood-red text-white py-4 font-headline-xl text-xl uppercase tracking-widest transition-all duration-300 text-center">
-                  Unlock Access
-                </div>
-              </div>
-            </button>
+              return (
+                <button
+                  key={batchNumber}
+                  onClick={() => handleBatchClick(batchNumber)}
+                  disabled={isDisabled}
+                  className={`group relative bg-void-black/60 border-2 p-1 transition-all duration-500 shadow-[0_0_20px_rgba(0,0,0,0.3)] text-left ${isAssigned ? "border-blood-red/30 hover:border-crimson-glare" : "border-white/10 opacity-40"} ${isDisabled ? "cursor-not-allowed" : ""}`}
+                >
+                  <div className={`absolute top-4 right-4 border text-[10px] px-3 py-1 uppercase font-bold tracking-widest ${isLocked ? "bg-blood-red/10 border-blood-red/40 text-blood-red" : "bg-green-500/10 border-green-500/40 text-green-400"}`}>
+                    {isLocked ? "Locked" : "Unlocked"}
+                  </div>
+                  <div className="absolute top-4 left-4 border border-white/10 text-white/60 text-[10px] px-3 py-1 uppercase font-bold tracking-widest">
+                    {progress.replace("_", " ")}
+                  </div>
+                  <div className="p-8 space-y-8 flex flex-col items-center">
+                    <h3 className="font-headline-xl text-3xl text-on-surface uppercase tracking-widest w-full text-center">Batch {batchNumber}</h3>
+                    <div className="relative py-12 text-center w-full">
+                      <span className={`material-symbols-outlined text-8xl transition-colors duration-500 ${isLocked ? "text-on-surface-variant/20" : "text-green-400"}`}>lock</span>
+                    </div>
+                    <p className="font-body-md text-on-surface-variant/60 text-center leading-relaxed h-20">
+                      {batchNumber === 1 && "Initial evidence collection regarding the Sector 4 anomaly."}
+                      {batchNumber === 2 && "Secondary evidence compartment. Access restricted pending completion of Batch 1 analysis."}
+                      {batchNumber === 3 && "Final evidence repository. High-level encryption applied."}
+                    </p>
+                    <div className={`w-full border-2 py-4 font-headline-xl text-xl uppercase tracking-widest transition-all duration-300 text-center ${isLocked ? "bg-blood-red/20 border-blood-red text-white" : "bg-green-500/20 border-green-500 text-white"}`}>
+                      {progress === "completed" ? "View Results" : progress === "in_progress" ? "Resume" : "Unlock Access"}
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
           </div>
 
           {/* Return Home Link */}

@@ -35,7 +35,7 @@ export default function SignInPage() {
               IDENTITY VERIFICATION
             </h1>
             <SignIn 
-              forceRedirectUrl="/dashboard"
+              forceRedirectUrl="/post-auth"
               appearance={{
                 elements: {
                   formButtonPrimary: "bg-crimson-glare hover:bg-blood-red text-white font-headline-md uppercase tracking-widest border-2 border-white/20 transition-all rounded-full h-12 shadow-[0_0_20px_rgba(220,20,60,0.6)] animate-pulse-glow",

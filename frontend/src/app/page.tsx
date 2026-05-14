@@ -7,7 +7,6 @@ import Link from 'next/link';
 import { SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
 import Logo from './logo.png';
 import BreathingText from "@/components/fancy/text/breathing-text";
-import { Shield } from 'lucide-react';
 
 // Dynamically import the 3D scene so it only runs on the client
 const Scene = dynamic(() => import('../components/Scene'), { ssr: false });
@@ -27,13 +26,6 @@ export default function LandingPage() {
           </div>
         </div>
         <div className="flex items-center gap-6">
-          <Link href="/admin/login" className="hidden md:flex items-center gap-2 text-white bg-zinc-900 hover:bg-blood-red px-8 py-2.5 border border-blood-red/40 text-xs font-bold uppercase tracking-[0.2em] transition-all shadow-[0_0_15px_rgba(220,20,60,0.1)] rounded-full">
-            <Shield size={14} className="text-blood-red group-hover:text-white" />
-            ADMIN
-          </Link>
-          <Link href="/team" className="hidden md:block text-on-surface hover:text-white bg-blood-red/20 hover:bg-blood-red px-8 py-2.5 border border-blood-red/40 text-xs font-bold uppercase tracking-[0.2em] transition-all shadow-[0_0_15px_rgba(220,20,60,0.2)] rounded-full">
-            KNOW THE TEAM
-          </Link>
           <SignedIn>
             <UserButton appearance={{ elements: { userButtonAvatarBox: "w-10 h-10 border-2 border-blood-red" } }} />
           </SignedIn>
@@ -66,7 +58,7 @@ export default function LandingPage() {
                 </BreathingText>
               </div>
               <SignedOut>
-                <Link href="/sign-in" className="bg-blood-red text-white font-headline-xl text-xl md:text-2xl px-12 py-5 rounded-full uppercase tracking-widest shadow-[0_0_20px_rgba(220,20,60,0.8)] hover:shadow-[0_0_40px_rgba(220,20,60,1)] transition-all duration-500 border-2 border-crimson-glare group relative overflow-hidden flex items-center justify-center text-center animate-pulse hover:animate-none">
+                <Link href="/login" className="bg-blood-red text-white font-headline-xl text-xl md:text-2xl px-12 py-5 rounded-full uppercase tracking-widest shadow-[0_0_20px_rgba(220,20,60,0.8)] hover:shadow-[0_0_40px_rgba(220,20,60,1)] transition-all duration-500 border-2 border-crimson-glare group relative overflow-hidden flex items-center justify-center text-center animate-pulse hover:animate-none">
                   <span className="relative z-10 text-white font-bold drop-shadow-md">JOIN NOW</span>
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
                   <div className="absolute inset-0 bg-crimson-glare/20 scale-x-0 group-hover:scale-x-125 transition-transform duration-700 rounded-full"></div>

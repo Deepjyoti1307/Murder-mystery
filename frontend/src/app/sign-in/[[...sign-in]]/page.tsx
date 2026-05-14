@@ -8,10 +8,10 @@ const Scene = dynamic(() => import('../../../components/Scene'), { ssr: false })
 export default function SignInPage() {
   return (
     <div className="bg-background text-on-surface font-body-md min-h-screen flex flex-col relative overflow-x-hidden selection:bg-crimson-glare selection:text-white texture-overlay">
-      
+
       {/* Background with Scene */}
       <div className="fixed inset-0 z-0 bg-void-black">
-        <div className="absolute inset-0 z-0 bg-cover bg-center opacity-30" style={{backgroundImage: "url('https://lh3.googleusercontent.com/aida-public/AB6AXuCNcx60Jfp1KdmECGFeWD1Wim72Vi6llJHHP3rwVMqMCaB-SAFy8VP7Pt2Es766nwjj8_p2Ft9TGjMgXRccbAW57a0kzkfpyZu8ApmjbBN3PA54lTpJSLb9HW398KFb1WtvGSzw5q5ce2qgpqJPAAG4w9ut3p1BUHkl0FhbVIyC6RhOahSw6q9uzYxJz7bp1hPpdr1WRIGNhGMG_HXr47wmaxa6OXxRP3IOmZZzCxadtWXN22N5Q3Ew5L1ioxiAplPUZJFmiEcyOJq1')"}}>
+        <div className="absolute inset-0 z-0 bg-cover bg-center opacity-30" style={{ backgroundImage: "url('https://lh3.googleusercontent.com/aida-public/AB6AXuCNcx60Jfp1KdmECGFeWD1Wim72Vi6llJHHP3rwVMqMCaB-SAFy8VP7Pt2Es766nwjj8_p2Ft9TGjMgXRccbAW57a0kzkfpyZu8ApmjbBN3PA54lTpJSLb9HW398KFb1WtvGSzw5q5ce2qgpqJPAAG4w9ut3p1BUHkl0FhbVIyC6RhOahSw6q9uzYxJz7bp1hPpdr1WRIGNhGMG_HXr47wmaxa6OXxRP3IOmZZzCxadtWXN22N5Q3Ew5L1ioxiAplPUZJFmiEcyOJq1')" }}>
           <Scene />
         </div>
         <div className="absolute inset-0 bg-gradient-to-b from-void-black/60 via-transparent to-void-black/80 z-10"></div>
@@ -34,7 +34,7 @@ export default function SignInPage() {
             <h1 className="font-headline-xl text-4xl text-on-surface uppercase mb-10 drop-shadow-[0_0_20px_rgba(220,20,60,1)] tracking-[0.2em] text-center">
               IDENTITY VERIFICATION
             </h1>
-            <SignIn 
+            <SignIn
               forceRedirectUrl="/post-auth"
               appearance={{
                 elements: {

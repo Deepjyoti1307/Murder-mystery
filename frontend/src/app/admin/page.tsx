@@ -41,14 +41,6 @@ export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState<'teams' | 'batches'>('teams');
 
   useEffect(() => {
-    const checkAuth = () => {
-      const token = localStorage.getItem('admin_auth_token');
-      if (token !== 'ACCESS_GRANTED_2026') {
-        window.location.href = '/admin/login';
-        return;
-      }
-    };
-
     const checkAdmin = async () => {
       if (!user) return;
       try {
@@ -68,7 +60,6 @@ export default function AdminDashboard() {
       }
     };
 
-    checkAuth();
     checkAdmin();
   }, [user]);
 

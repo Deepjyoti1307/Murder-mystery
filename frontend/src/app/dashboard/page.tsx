@@ -48,7 +48,11 @@ export default function Dashboard() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          ...formData,
+          team_name: formData.teamName,
+          leader_name: formData.leaderName,
+          phone_number: formData.phoneNumber,
+          college_name: formData.collegeName,
+          access_code: formData.accessCode,
           clerk_id: user?.id
         }),
       });
@@ -57,9 +61,14 @@ export default function Dashboard() {
 
       if (response.ok) {
         // Success! Redirect to the story section
-        router.push('/story');
+        router.push(`/story/${selectedBatch}`);
       } else {
-        setError(data.detail || 'AUTHORIZATION DENIED. CHECK YOUR CODE.');
+        const errorMsg = typeof data.detail === 'string' 
+          ? data.detail 
+          : Array.isArray(data.detail) 
+            ? data.detail[0]?.msg 
+            : 'AUTHORIZATION DENIED. CHECK YOUR CODE.';
+        setError(errorMsg);
       }
     } catch (err) {
       setError('COMMUNICATION FAILURE. TERMINAL OFFLINE.');

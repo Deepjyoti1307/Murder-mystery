@@ -32,7 +32,10 @@ class Team(Document):
     phone_number: str
     college_name: str
     batch_id: int
-    entry_timestamp: datetime = Field(default_factory=datetime.utcnow)
+    entry_timestamp: Optional[datetime] = None
+    start_time: Optional[datetime] = None # When they actually open the story
+    answers: List[dict] = [] # List of {q_id: int, answer: str, is_correct: bool, hints_used: int}
+    current_question: int = 1
     
     class Settings:
         name = "teams"
@@ -42,6 +45,7 @@ class Batch(Document):
     is_locked: bool = True
     codeword: str
     story_content: str
+    questions: List[dict] = [] # List of {id: int, text: str, options: [str], correct: str, hints: [str]}
     
     class Settings:
         name = "batches"
@@ -54,6 +58,9 @@ class AccessRequest(BaseModel):
     phone_number: str
     college_name: str
     access_code: str
+    clerk_id: str
+
+class StartRequest(BaseModel):
     clerk_id: str
 
 # --- LIFESPAN (NEW STARTUP PATTERN) ---
@@ -135,6 +142,170 @@ async def enter_batch(batch_id: int, request: AccessRequest):
 
     return {"status": "success", "message": "AUTHORIZATION GRANTED"}
 
+@app.get("/api/story/{batch_id}")
+async def get_story(batch_id: int):
+    batch = await Batch.find_one(Batch.batch_id == batch_id)
+    if not batch:
+        raise HTTPException(status_code=404, detail="DOSSIER NOT FOUND.")
+    return {"content": batch.story_content}
+
+@app.post("/api/batch/{batch_id}/start")
+async def start_batch(batch_id: int, request: StartRequest):
+    team = await Team.find_one(Team.clerk_id == request.clerk_id, Team.batch_id == batch_id)
+    if not team:
+        raise HTTPException(status_code=404, detail="TEAM NOT REGISTERED.")
+    
+    if not team.start_time:
+        team.start_time = datetime.utcnow()
+        await team.save()
+    
+    return {"status": "timer_started", "start_time": team.start_time}
+
+@app.get("/api/quiz/{batch_id}/questions")
+async def get_questions(batch_id: int):
+    batch = await Batch.find_one(Batch.batch_id == batch_id)
+    if not batch:
+        raise HTTPException(status_code=404, detail="BATCH NOT FOUND.")
+    
+    # Return questions WITHOUT the 'correct' field, but with hint_count
+    secure_questions = []
+    for q in batch.questions:
+        secure_questions.append({
+            "id": q["id"],
+            "text": q["text"],
+            "options": q["options"],
+            "hint_count": len(q.get("hints", []))
+        })
+    return secure_questions
+
+class AnswerSubmission(BaseModel):
+    clerk_id: str
+    question_id: int
+    answer: str # e.g., "A", "B", "C", "D"
+
+@app.post("/api/quiz/{batch_id}/submit")
+async def submit_answer(batch_id: int, submission: AnswerSubmission):
+    team = await Team.find_one(Team.clerk_id == submission.clerk_id, Team.batch_id == batch_id)
+    if not team:
+        raise HTTPException(status_code=404, detail="TEAM NOT FOUND.")
+    
+    batch = await Batch.find_one(Batch.batch_id == batch_id)
+    if not batch:
+        raise HTTPException(status_code=404, detail="BATCH NOT FOUND.")
+
+    question = next((q for q in batch.questions if q["id"] == submission.question_id), None)
+    if not question:
+        raise HTTPException(status_code=400, detail="INVALID QUESTION ID.")
+
+    import re
+    def normalize(s: str) -> str:
+        return re.sub(r'[^A-Z0-9]', '', str(s).upper())
+
+    is_correct = normalize(submission.answer) == normalize(question["correct"])
+    
+    # Check if they already used hints for this question
+    existing_entry = next((a for a in team.answers if a["q_id"] == submission.question_id), None)
+    hints_used = existing_entry.get("hints_used", 0) if existing_entry else 0
+
+    # Update answers list
+    team.answers = [a for a in team.answers if a["q_id"] != submission.question_id]
+    team.answers.append({
+        "q_id": submission.question_id,
+        "answer": submission.answer,
+        "is_correct": is_correct,
+        "hints_used": hints_used,
+        "timestamp": datetime.utcnow().isoformat()
+    })
+    
+    team.current_question = max(team.current_question, submission.question_id + 1)
+    await team.save()
+    
+    return {"is_correct": is_correct, "message": "ANALYSIS LOGGED" if is_correct else "DISCREPANCY DETECTED"}
+
+class HintRequest(BaseModel):
+    clerk_id: str
+    question_id: int
+
+@app.get("/api/quiz/{batch_id}/hints/{question_id}")
+async def get_revealed_hints(batch_id: int, question_id: int, clerk_id: str):
+    team = await Team.find_one(Team.clerk_id == clerk_id, Team.batch_id == batch_id)
+    if not team:
+        return {"hints": []}
+    
+    batch = await Batch.find_one(Batch.batch_id == batch_id)
+    question = next((q for q in batch.questions if q["id"] == question_id), None)
+    if not question:
+        return {"hints": []}
+        
+    ans_entry = next((a for a in team.answers if a["q_id"] == question_id), None)
+    count = ans_entry.get("hints_used", 0) if ans_entry else 0
+    
+    return {"hints": question["hints"][:count]}
+
+@app.post("/api/quiz/{batch_id}/hints/reveal")
+async def reveal_hint(batch_id: int, request: HintRequest):
+    team = await Team.find_one(Team.clerk_id == request.clerk_id, Team.batch_id == batch_id)
+    if not team:
+        raise HTTPException(status_code=404, detail="TEAM NOT FOUND.")
+    
+    batch = await Batch.find_one(Batch.batch_id == batch_id)
+    question = next((q for q in batch.questions if q["id"] == request.question_id), None)
+    if not question or not question["hints"]:
+         raise HTTPException(status_code=400, detail="NO HINTS AVAILABLE FOR THIS QUESTION.")
+
+    existing_entry = next((a for a in team.answers if a["q_id"] == request.question_id), None)
+    hints_count = existing_entry.get("hints_used", 0) if existing_entry else 0
+    
+    if hints_count >= len(question["hints"]):
+        raise HTTPException(status_code=400, detail="ALL HINTS ALREADY DECRYPTED.")
+
+    new_hints_count = hints_count + 1
+    hint_to_reveal = question["hints"][hints_count]
+
+    if existing_entry:
+        existing_entry["hints_used"] = new_hints_count
+    else:
+        team.answers.append({
+            "q_id": request.question_id,
+            "answer": None,
+            "is_correct": False,
+            "hints_used": new_hints_count,
+            "timestamp": datetime.utcnow().isoformat()
+        })
+    
+    await team.save()
+    penalty = -2 if new_hints_count == 1 else -4
+    return {
+        "hint": hint_to_reveal, 
+        "hints_used": new_hints_count, 
+        "penalty": penalty,
+        "message": f"HINT DECRYPTED. PENALTY: {penalty} POINTS."
+    }
+
+@app.get("/api/quiz/{batch_id}/progress")
+async def get_team_progress(batch_id: int, clerk_id: str):
+    team = await Team.find_one(Team.clerk_id == clerk_id, Team.batch_id == batch_id)
+    if not team:
+        return {"current_question": 1, "answers": []}
+    
+    # We only return the hints they've ALREADY revealed
+    batch = await Batch.find_one(Batch.batch_id == batch_id)
+    revealed_hints = {}
+    
+    for ans in team.answers:
+        q_id = ans["q_id"]
+        count = ans.get("hints_used", 0)
+        if count > 0:
+            question = next((q for q in batch.questions if q["id"] == q_id), None)
+            if question:
+                revealed_hints[q_id] = question["hints"][:count]
+                
+    return {
+        "current_question": team.current_question,
+        "revealed_hints": revealed_hints,
+        "total_penalty": sum([-2 if a.get("hints_used", 0) == 1 else -4 if a.get("hints_used", 0) >= 2 else 0 for a in team.answers])
+    }
+
 # --- ADMIN ENDPOINTS ---
 
 @app.get("/api/admin/teams")
@@ -155,21 +326,114 @@ async def get_stats():
 
 @app.post("/api/admin/batch/init")
 async def init_batches():
-    # Helper to create initial batches with unique codes
+    # Helper to create initial batches with unique codes and read stories from files
     batches_to_create = [
-        {"id": 1, "code": "CRIMSON2026", "story": "THE INVESTIGATION BEGINS AT THE CRIMSON ARCHIVE..."},
-        {"id": 2, "code": "VOIDSHADOW2026", "story": "THE SHADOWS HIDE THE DEEPEST SECRETS..."},
-        {"id": 3, "code": "DEATHLYSILENCE2026", "story": "ONLY SILENCE REMAINS IN THE FINAL CHAMBER..."}
+        {"id": 1, "code": "CRIMSON2026", "story_file": "../../batch 1 story.txt", "q_file": "../../batch 1 questions.txt"},
+        {"id": 2, "code": "VOIDSHADOW2026", "story_file": "../../batch 2 story.txt", "q_file": "../../batch 2 questions.txt"},
+        {"id": 3, "code": "DEATHLYSILENCE2026", "story_file": None, "q_file": None}
     ]
     
     for b_data in batches_to_create:
+        print(f"--- INITIALIZING BATCH {b_data['id']} ---")
+        
+        # Robust file finding
+        story_content = "THE INVESTIGATION HAS NOT YET BEGUN..."
+        for path_prefix in ["", "../", "../../"]:
+            p = os.path.join(path_prefix, b_data["story_file"]) if b_data["story_file"] else None
+            if p and os.path.exists(p):
+                print(f"Found story file at: {os.path.abspath(p)}")
+                with open(p, "r", encoding="utf-8") as f:
+                    story_content = f.read()
+                break
+
+        parsed_questions = []
+        if b_data["q_file"]:
+            target_q_file = None
+            for path_prefix in ["", "../", "../../"]:
+                p = os.path.join(path_prefix, b_data["q_file"])
+                if os.path.exists(p):
+                    target_q_file = p
+                    break
+            
+            if target_q_file:
+                print(f"Found questions file at: {os.path.abspath(target_q_file)}")
+                with open(target_q_file, "r", encoding="utf-8") as f:
+                    full_q_text = f.read()
+                    
+                    # 1. Split to only get the questions section (ignore the key)
+                    q_section = full_q_text.split('OFFICIAL ANSWER KEY')[0]
+                    ans_key_section = full_q_text.split('OFFICIAL ANSWER KEY')[1] if 'OFFICIAL ANSWER KEY' in full_q_text else ""
+                    
+                    import re
+                    q_blocks = re.split(r'Q\d+\.', q_section)[1:] # Split by Q1., Q2., etc.
+                    print(f"Found {len(q_blocks)} question blocks.")
+                    
+                    for i, block in enumerate(q_blocks):
+                        q_id = i + 1
+                        if '(A)' in block:
+                            parts_a = block.split('(A)')
+                            text_parts = parts_a[0].strip()
+                            
+                            remaining = parts_a[1] if len(parts_a) > 1 else ""
+                            parts_b = remaining.split('(B)')
+                            opt_a = parts_b[0].strip()
+                            
+                            remaining = parts_b[1] if len(parts_b) > 1 else ""
+                            parts_c = remaining.split('(C)')
+                            opt_b = parts_c[0].strip()
+                            
+                            remaining = parts_c[1] if len(parts_c) > 1 else ""
+                            parts_d = remaining.split('(D)')
+                            opt_c = parts_d[0].strip()
+                            
+                            remaining_d = parts_d[1] if len(parts_d) > 1 else ""
+                            d_lines = [l.strip() for l in remaining_d.split('\n') if l.strip()]
+                            
+                            opt_d = d_lines[0] if d_lines else ""
+                            hints = d_lines[1:] if len(d_lines) > 1 else []
+                            
+                            if not hints:
+                                hints = re.findall(r'[Hh]int\s*\d*:\s*(.*?)(?=\s*[Hh]int|$)', remaining_d, re.DOTALL)
+                                hints = [h.strip() for h in hints if h.strip()]
+
+                            options = [f"(A) {opt_a}", f"(B) {opt_b}", f"(C) {opt_c}", f"(D) {opt_d}"]
+                        else:
+                            text_parts = block.strip()
+                            hints = re.findall(r'[Hh]int\s*\d*:\s*(.*?)(?=\s*[Hh]int|$)', block, re.DOTALL)
+                            hints = [h.strip() for h in hints if h.strip()]
+                            text_parts = re.split(r'[Hh]int\s*1:', text_parts)[0].strip()
+                            options = []
+
+                        ans_match = re.search(fr'Q{q_id}\.\s*Correct Answer:\s*\(([A-D])\)(.*)', ans_key_section)
+                        if not options:
+                            correct_ans = ans_match.group(2).strip() if ans_match else ""
+                        else:
+                            correct_ans = ans_match.group(1) if ans_match else "A"
+                        
+                        parsed_questions.append({
+                            "id": q_id,
+                            "text": text_parts,
+                            "options": options,
+                            "correct": correct_ans,
+                            "hints": hints
+                        })
+                    print(f"Parsed {len(parsed_questions)} questions with hints.")
+            else:
+                print(f"ERROR: FILE NOT FOUND AT {file_path}")
+                
         exists = await Batch.find_one(Batch.batch_id == b_data["id"])
-        if not exists:
+        if exists:
+            exists.codeword = b_data["code"]
+            exists.story_content = story_content
+            exists.questions = parsed_questions
+            await exists.save()
+        else:
             new_batch = Batch(
                 batch_id=b_data["id"],
                 is_locked=True,
                 codeword=b_data["code"],
-                story_content=b_data["story"]
+                story_content=story_content,
+                questions=parsed_questions
             )
             await new_batch.insert()
     return {"status": "initialized", "codes_configured": True}

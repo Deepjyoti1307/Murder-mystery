@@ -330,7 +330,7 @@ async def init_batches():
     batches_to_create = [
         {"id": 1, "code": "CRIMSON2026", "story_file": "../../batch 1 story.txt", "q_file": "../../batch 1 questions.txt"},
         {"id": 2, "code": "VOIDSHADOW2026", "story_file": "../../batch 2 story.txt", "q_file": "../../batch 2 questions.txt"},
-        {"id": 3, "code": "DEATHLYSILENCE2026", "story_file": None, "q_file": None}
+        {"id": 3, "code": "DEATHLYSILENCE2026", "story_file": "../../batch 1 story.txt", "q_file": "../../batch 1 questions.txt"}
     ]
     
     for b_data in batches_to_create:

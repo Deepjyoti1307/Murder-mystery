@@ -105,6 +105,25 @@ export default function QuizPage() {
     } catch (err) {}
   };
 
+  const handleFinish = async () => {
+    if (!user) return;
+    setIsSubmitting(true);
+    try {
+      const response = await fetch(`http://localhost:8000/api/quiz/${id}/finish`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ clerk_id: user.id })
+      });
+      if (response.ok) {
+        window.location.href = `/results/${id}`;
+      }
+    } catch (err) {
+      console.error("FINISH ERROR");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const nextQuestion = () => {
     if (currentIdx < questions.length - 1) {
       setCurrentIdx(currentIdx + 1);
@@ -249,13 +268,23 @@ export default function QuizPage() {
           </div>
 
           <div className="flex flex-col items-center gap-8 pt-8">
-            <button
-              onClick={handleSubmit}
-              disabled={!selectedOption || isSubmitting}
-              className="w-full max-w-sm bg-blood-red hover:bg-crimson-glare text-white py-5 font-bold uppercase tracking-[0.3em] shadow-[0_0_30px_rgba(139,0,0,0.3)] disabled:opacity-30 transition-all active:scale-95 text-lg"
-            >
-              {isSubmitting ? 'PROCESSING...' : 'SUBMIT ANALYSIS'}
-            </button>
+            {currentIdx === questions.length - 1 ? (
+              <button
+                onClick={handleFinish}
+                disabled={isSubmitting}
+                className="w-full max-w-sm bg-green-700 hover:bg-green-600 text-white py-5 font-bold uppercase tracking-[0.3em] shadow-[0_0_30_rgba(34,197,94,0.3)] transition-all active:scale-95 text-lg"
+              >
+                {isSubmitting ? 'UPLOADING...' : 'FINISH INVESTIGATION'}
+              </button>
+            ) : (
+              <button
+                onClick={handleSubmit}
+                disabled={!selectedOption || isSubmitting}
+                className="w-full max-w-sm bg-blood-red hover:bg-crimson-glare text-white py-5 font-bold uppercase tracking-[0.3em] shadow-[0_0_30_rgba(139,0,0,0.3)] disabled:opacity-30 transition-all active:scale-95 text-lg"
+              >
+                {isSubmitting ? 'PROCESSING...' : 'SUBMIT ANALYSIS'}
+              </button>
+            )}
 
             {feedback && (
               <div className={`text-center font-bold tracking-widest uppercase animate-slideUp ${feedback.isCorrect ? 'text-green-500 drop-shadow-[0_0_10px_rgba(34,197,94,0.5)]' : 'text-blood-red animate-shake'}`}>

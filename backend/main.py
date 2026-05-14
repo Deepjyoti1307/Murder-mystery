@@ -34,8 +34,11 @@ class Team(Document):
     batch_id: int
     entry_timestamp: Optional[datetime] = None
     start_time: Optional[datetime] = None # When they actually open the story
+    end_time: Optional[datetime] = None # When they finish the quiz
+    is_completed: bool = False
     answers: List[dict] = [] # List of {q_id: int, answer: str, is_correct: bool, hints_used: int}
     current_question: int = 1
+    total_score: int = 0
     
     class Settings:
         name = "teams"
@@ -437,3 +440,88 @@ async def init_batches():
             )
             await new_batch.insert()
     return {"status": "initialized", "codes_configured": True}
+
+@app.post("/api/quiz/{batch_id}/finish")
+async def finish_quiz(batch_id: int, request: StartRequest):
+    team = await Team.find_one(Team.clerk_id == request.clerk_id, Team.batch_id == batch_id)
+    if not team:
+        raise HTTPException(status_code=404, detail="TEAM NOT FOUND.")
+    
+    if not team.is_completed:
+        team.end_time = datetime.utcnow()
+        team.is_completed = True
+        
+        # Calculate final score with deductions
+        # Logic: Correct (+5), 1st Hint (-1), 2nd Hint (-3), Wrong (0)
+        calculated_score = 0
+        for ans in team.answers:
+            if ans.get("is_correct", False):
+                q_score = 5
+                hints = ans.get("hints_used", 0)
+                if hints == 1:
+                    q_score -= 1
+                elif hints >= 2:
+                    q_score -= 3
+                calculated_score += q_score
+        
+        team.total_score = calculated_score
+        await team.save()
+        
+    return {"status": "completed", "end_time": team.end_time}
+
+@app.get("/api/quiz/{batch_id}/results")
+async def get_results(batch_id: int, clerk_id: str):
+    team = await Team.find_one(Team.clerk_id == clerk_id, Team.batch_id == batch_id)
+    if not team:
+        raise HTTPException(status_code=404, detail="RESULTS NOT FOUND.")
+    
+    batch = await Batch.find_one(Batch.batch_id == batch_id)
+    total_q = len(batch.questions) if batch else 18
+    max_score = total_q * 5
+    
+    correct = sum(1 for a in team.answers if a.get("is_correct", False))
+    wrong = len(team.answers) - correct
+    unanswered = total_q - len(team.answers)
+    
+    # Calculate time taken
+    duration_str = "N/A"
+    if team.start_time and team.end_time:
+        diff = team.end_time - team.start_time
+        hours, remainder = divmod(diff.total_seconds(), 3600)
+        minutes, seconds = divmod(remainder, 60)
+        duration_str = f"{int(hours):02}:{int(minutes):02}:{int(seconds):02}"
+
+    return {
+        "team_name": team.team_name,
+        "correct": correct,
+        "wrong": wrong,
+        "unanswered": unanswered,
+        "total": total_q,
+        "max_score": max_score,
+        "time_taken": duration_str,
+        "score": team.total_score
+    }
+
+@app.get("/api/quiz/{batch_id}/leaderboard")
+async def get_leaderboard(batch_id: int):
+    # Fetch all completed teams for this batch
+    teams = await Team.find(Team.batch_id == batch_id, Team.is_completed == True).to_list()
+    
+    leaderboard = []
+    for t in teams:
+        duration = 0
+        if t.start_time and t.end_time:
+            duration = (t.end_time - t.start_time).total_seconds()
+            
+        leaderboard.append({
+            "team_name": t.team_name,
+            "college": t.college_name,
+            "score": t.total_score,
+            "duration": duration,
+            "duration_str": f"{int(duration//3600):02}:{int((duration%3600)//60):02}:{int(duration%60):02}"
+        })
+    
+    # Sort by score (desc) then duration (asc)
+    leaderboard.sort(key=lambda x: (-x["score"], x["duration"]))
+    return leaderboard
+

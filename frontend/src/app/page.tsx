@@ -26,6 +26,9 @@ export default function LandingPage() {
           </div>
         </div>
         <div className="flex items-center gap-6">
+          <Link href="/team" className="hidden md:block text-on-surface hover:text-white bg-blood-red/20 hover:bg-blood-red px-8 py-2.5 border border-blood-red/40 text-xs font-bold uppercase tracking-[0.2em] transition-all shadow-[0_0_15px_rgba(220,20,60,0.2)] rounded-full">
+            KNOW THE TEAM
+          </Link>
           <SignedIn>
             <UserButton appearance={{ elements: { userButtonAvatarBox: "w-10 h-10 border-2 border-blood-red" } }} />
           </SignedIn>

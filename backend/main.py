@@ -101,9 +101,10 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="Murder Mystery Backend", lifespan=lifespan)
 
 # Add CORS middleware to allow the frontend to communicate
+allowed_origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000").split(",")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

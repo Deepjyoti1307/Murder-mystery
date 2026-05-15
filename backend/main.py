@@ -687,3 +687,12 @@ async def admin_reset_team(team_clerk_id: str, clerk_id: str, batch_id: int):
     await team.save()
     return {"status": "reset_successful", "team": team.team_name}
 
+@app.delete("/api/admin/teams/{team_clerk_id}")
+async def admin_delete_team(team_clerk_id: str, clerk_id: str, batch_id: int):
+    await verify_admin(clerk_id)
+    team = await Team.find_one(Team.clerk_id == team_clerk_id, Team.batch_id == batch_id)
+    if not team:
+        raise HTTPException(status_code=404, detail="TEAM NOT FOUND.")
+    team_name = team.team_name
+    await team.delete()
+    return {"status": "deleted", "team": team_name}

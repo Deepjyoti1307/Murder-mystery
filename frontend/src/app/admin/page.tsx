@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useUser } from "@clerk/nextjs";
-import { Lock, Unlock, RotateCcw, Activity, Users, Database, X, Trash2, Plus } from 'lucide-react';
+import { Lock, Unlock, RotateCcw, Database, X, Trash2, Plus, Eye, Download } from 'lucide-react';
 import { API_BASE_URL } from '@/lib/api';
 
 interface Team {
@@ -20,6 +20,9 @@ interface Team {
   answers: Array<{
     q_id: number;
     is_correct: boolean;
+    answer?: string;
+    hints_used?: number;
+    timestamp?: string;
   }>;
 }
 
@@ -46,6 +49,7 @@ export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState<'teams' | 'batches'>('teams');
   const [editingBatch, setEditingBatch] = useState<Batch | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [viewingTeam, setViewingTeam] = useState<Team | null>(null);
 
   useEffect(() => {
     const checkAdmin = async () => {
@@ -129,6 +133,51 @@ export default function AdminDashboard() {
       });
       if (res.ok) fetchData();
     } catch (err) { }
+  };
+
+  const deleteTeam = async (teamClerkId: string, batchId: number, teamName: string) => {
+    const identifier = getAdminIdentifier();
+    if (!identifier || !confirm(`PERMANENTLY DELETE "${teamName}"? THIS CANNOT BE UNDONE.`)) return;
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/admin/teams/${teamClerkId}?clerk_id=${identifier}&batch_id=${batchId}`, {
+        method: 'DELETE'
+      });
+      if (res.ok) fetchData();
+    } catch (err) { }
+  };
+
+  const exportCSV = (team: Team) => {
+    const batch = batches.find(b => b.batch_id === team.batch_id);
+    const correct = team.answers.filter(a => a.is_correct).length;
+    const meta = [
+      `Team Name,"${team.team_name}"`,
+      `Leader,"${team.leader_name}"`,
+      `College,"${team.college_name}"`,
+      `Batch,${team.batch_id}`,
+      `Score,${team.total_score}`,
+      `Correct,${correct}`,
+      `Wrong,${team.answers.length - correct}`,
+      `Status,${team.is_completed ? 'COMPLETED' : 'IN PROGRESS'}`,
+      '',
+      'Q#,Question,Team Answer,Correct Answer,Result,Hints Used',
+    ];
+    const rows = team.answers.map(a => {
+      const q = batch?.questions?.find(q => q.id === a.q_id);
+      return [
+        `Q${a.q_id}`,
+        `"${(q?.text || 'N/A').replace(/"/g, '""')}"`,
+        `"${(a.answer || 'NO ANSWER').replace(/"/g, '""')}"`,
+        `"${(q?.correct || 'N/A').replace(/"/g, '""')}"`,
+        a.is_correct ? 'CORRECT' : 'WRONG',
+        a.hints_used || 0,
+      ].join(',');
+    });
+    const csv = [...meta, ...rows].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const el = document.createElement('a');
+    el.href = url; el.download = `${team.team_name.replace(/\s+/g,'_')}_B${team.batch_id}.csv`;
+    el.click(); URL.revokeObjectURL(url);
   };
 
   const saveBatch = async () => {
@@ -273,13 +322,29 @@ export default function AdminDashboard() {
                         {team.total_score}
                       </td>
                       <td className="py-8 px-4 text-right">
-                        <button
-                          onClick={() => resetTeam(team.clerk_id, team.batch_id)}
-                          className="p-4 bg-zinc-900 border border-white/10 text-white/40 hover:text-blood-red hover:border-blood-red transition-all"
-                          title="RESET TEAM PROGRESS"
-                        >
-                          <RotateCcw size={20} />
-                        </button>
+                        <div className="flex gap-2 justify-end">
+                          <button
+                            onClick={() => setViewingTeam(team)}
+                            className="p-4 bg-zinc-900 border border-white/10 text-white/40 hover:text-blue-400 hover:border-blue-400 transition-all"
+                            title="VIEW TEAM DETAILS"
+                          >
+                            <Eye size={20} />
+                          </button>
+                          <button
+                            onClick={() => resetTeam(team.clerk_id, team.batch_id)}
+                            className="p-4 bg-zinc-900 border border-white/10 text-white/40 hover:text-blood-red hover:border-blood-red transition-all"
+                            title="RESET TEAM PROGRESS"
+                          >
+                            <RotateCcw size={20} />
+                          </button>
+                          <button
+                            onClick={() => deleteTeam(team.clerk_id, team.batch_id, team.team_name)}
+                            className="p-4 bg-zinc-900 border border-white/10 text-white/40 hover:text-red-500 hover:border-red-500 hover:bg-red-500/10 transition-all"
+                            title="DELETE TEAM PERMANENTLY"
+                          >
+                            <Trash2 size={20} />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -541,6 +606,93 @@ export default function AdminDashboard() {
           </div>
         </div>
       )}
+
+      {/* Team Detail Modal */}
+      {viewingTeam && (() => {
+        const batch = batches.find(b => b.batch_id === viewingTeam.batch_id);
+        const correct = viewingTeam.answers.filter(a => a.is_correct).length;
+        let durationStr = '---';
+        if (viewingTeam.start_time && viewingTeam.end_time) {
+          const diff = (new Date(viewingTeam.end_time).getTime() - new Date(viewingTeam.start_time).getTime()) / 1000;
+          durationStr = `${Math.floor(diff / 60)}m ${Math.floor(diff % 60)}s`;
+        }
+        return (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/95 backdrop-blur-md" onClick={() => setViewingTeam(null)} />
+            <div className="relative bg-zinc-950 border-2 border-white/10 w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl">
+              {/* Modal Header */}
+              <div className="p-6 border-b border-white/10 bg-black/60 flex justify-between items-start">
+                <div>
+                  <div className="text-[10px] text-blood-red font-bold tracking-[0.4em] uppercase mb-1">OPERATIVE DOSSIER // BATCH {viewingTeam.batch_id}</div>
+                  <h2 className="text-2xl font-bold text-white tracking-widest uppercase">{viewingTeam.team_name}</h2>
+                  <div className="text-xs text-on-surface-variant/60 mt-1">{viewingTeam.leader_name} · {viewingTeam.college_name}</div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => exportCSV(viewingTeam)}
+                    className="flex items-center gap-2 px-5 py-3 bg-green-500/10 border border-green-500/40 text-green-500 hover:bg-green-500/20 text-[10px] font-bold uppercase tracking-widest transition-all"
+                  >
+                    <Download size={14} /> EXPORT CSV
+                  </button>
+                  <button onClick={() => setViewingTeam(null)} className="p-2 text-white/40 hover:text-white transition-colors">
+                    <X size={24} />
+                  </button>
+                </div>
+              </div>
+              {/* Stats Row */}
+              <div className="grid grid-cols-4 divide-x divide-white/5 border-b border-white/10">
+                {[{label:'SCORE', val: viewingTeam.total_score, color:'text-white'},
+                  {label:'CORRECT', val: correct, color:'text-green-500'},
+                  {label:'WRONG', val: viewingTeam.answers.length - correct, color:'text-blood-red'},
+                  {label:'TIME', val: durationStr, color:'text-white/60'}].map(s => (
+                  <div key={s.label} className="p-5 flex flex-col items-center gap-1">
+                    <span className="text-[9px] text-on-surface-variant/40 tracking-widest uppercase">{s.label}</span>
+                    <span className={`text-2xl font-bold font-mono ${s.color}`}>{s.val}</span>
+                  </div>
+                ))}
+              </div>
+              {/* Answer Table */}
+              <div className="flex-1 overflow-y-auto">
+                {viewingTeam.answers.length === 0 ? (
+                  <div className="p-12 text-center text-on-surface-variant/40 text-xs tracking-widest uppercase">NO ANSWERS RECORDED YET</div>
+                ) : (
+                  <table className="w-full text-left">
+                    <thead className="sticky top-0 bg-zinc-900">
+                      <tr className="text-[10px] text-on-surface-variant/40 tracking-[0.2em] uppercase border-b border-white/5">
+                        <th className="py-4 px-6">Q#</th>
+                        <th className="py-4 px-6">QUESTION</th>
+                        <th className="py-4 px-6">TEAM ANSWER</th>
+                        <th className="py-4 px-6">CORRECT</th>
+                        <th className="py-4 px-6">RESULT</th>
+                        <th className="py-4 px-6">HINTS</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/5">
+                      {viewingTeam.answers.sort((a,b) => a.q_id - b.q_id).map(ans => {
+                        const q = batch?.questions?.find(q => q.id === ans.q_id);
+                        return (
+                          <tr key={ans.q_id} className={`text-sm ${ans.is_correct ? 'bg-green-500/5' : 'bg-blood-red/5'}`}>
+                            <td className="py-4 px-6 font-bold text-blood-red font-mono">Q{ans.q_id}</td>
+                            <td className="py-4 px-6 text-white/70 max-w-xs">{q?.text || '—'}</td>
+                            <td className="py-4 px-6 font-mono text-white">{ans.answer || '—'}</td>
+                            <td className="py-4 px-6 font-mono text-green-400">{q?.correct || '—'}</td>
+                            <td className="py-4 px-6">
+                              <span className={`px-3 py-1 text-[10px] font-bold rounded-sm tracking-widest ${
+                                ans.is_correct ? 'bg-green-500/20 text-green-500' : 'bg-blood-red/20 text-blood-red'
+                              }`}>{ans.is_correct ? '✓ CORRECT' : '✗ WRONG'}</span>
+                            </td>
+                            <td className="py-4 px-6 text-on-surface-variant/60">{ans.hints_used || 0}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

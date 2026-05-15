@@ -151,6 +151,7 @@ export default function AdminDashboard() {
     const correct = team.answers.filter(a => a.is_correct).length;
     const meta = [
       `Team Name,"${team.team_name}"`,
+      `Team ID,"${team.team_id || 'N/A'}"`,
       `Leader,"${team.leader_name}"`,
       `College,"${team.college_name}"`,
       `Batch,${team.batch_id}`,
@@ -182,7 +183,7 @@ export default function AdminDashboard() {
 
   const exportAllTeamsCSV = () => {
     const sorted = [...teams].sort((a, b) => b.total_score - a.total_score);
-    const headers = ['Rank', 'Team Name', 'Leader', 'College', 'Batch', 'Status', 'Score', 'Correct', 'Wrong', 'Progress', 'Time Taken'];
+    const headers = ['Rank', 'Team ID', 'Team Name', 'Leader', 'College', 'Batch', 'Status', 'Score', 'Correct', 'Wrong', 'Progress', 'Time Taken'];
     const rows = sorted.map((team, i) => {
       const correct = team.answers.filter(a => a.is_correct).length;
       const wrong = team.answers.length - correct;
@@ -195,6 +196,7 @@ export default function AdminDashboard() {
       }
       return [
         i + 1,
+        `"${team.team_id || 'N/A'}"`,
         `"${team.team_name}"`,
         `"${team.leader_name}"`,
         `"${team.college_name}"`,

@@ -92,39 +92,39 @@ export default function Dashboard() {
       {/* Main Content Area */}
       <main className="relative z-20 flex-1 flex flex-col h-screen overflow-y-auto">
         {/* Top Header Bar */}
-        <header className="sticky top-0 z-30 bg-void-black/90 backdrop-blur-xl border-b-2 border-blood-red/20 py-4 px-8 flex justify-between items-center">
-          <div className="flex flex-col">
-            <h1 className="font-headline-xl text-3xl text-on-surface tracking-[0.3em] uppercase drop-shadow-hazard-glow">
+        <header className="sticky top-0 z-30 bg-void-black/90 backdrop-blur-xl border-b-2 border-blood-red/20 py-3 px-4 md:py-4 md:px-8 flex flex-col md:flex-row justify-between items-center gap-3">
+          <div className="flex flex-col items-center md:items-start text-center md:text-left">
+            <h1 className="font-headline-xl text-xl md:text-3xl text-on-surface tracking-[0.2em] md:tracking-[0.3em] uppercase drop-shadow-hazard-glow">
               Investigation Hub
             </h1>
-            <div className="flex items-center gap-4 mt-1">
-              <p className="text-on-surface-variant/40 font-body-sm uppercase tracking-widest">
+            <div className="flex items-center gap-2 md:gap-4 mt-1">
+              <p className="text-on-surface-variant/40 font-body-sm uppercase tracking-widest text-[9px] md:text-xs">
                 Sector 4 // Anomaly-77
               </p>
-              <div className="h-4 w-[1px] bg-blood-red/20"></div>
-              <p className="text-crimson-glare font-body-sm uppercase tracking-widest font-bold">
+              <div className="h-3 md:h-4 w-[1px] bg-blood-red/20"></div>
+              <p className="text-crimson-glare font-body-sm uppercase tracking-widest font-bold text-[9px] md:text-xs">
                 Operative {user?.firstName?.toUpperCase() || 'UNKNOWN'}
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-8">
-            <div className="flex items-center gap-6">
-              <span className="font-headline-md text-crimson-glare animate-pulse tracking-widest">T-MINUS: 04:12:59</span>
-              <div className="h-8 w-[2px] bg-blood-red/20"></div>
-              <UserButton appearance={{ elements: { userButtonAvatarBox: "w-10 h-10 border-2 border-blood-red shadow-[0_0_10px_rgba(139,0,0,0.5)]" } }} />
+          <div className="flex items-center gap-4 md:gap-8">
+            <div className="flex items-center gap-3 md:gap-6">
+              <span className="font-headline-md text-crimson-glare animate-pulse tracking-widest text-xs md:text-base">T-MINUS: 04:12:59</span>
+              <div className="h-6 md:h-8 w-[2px] bg-blood-red/20"></div>
+              <UserButton appearance={{ elements: { userButtonAvatarBox: "w-8 h-8 md:w-10 md:h-10 border-2 border-blood-red shadow-[0_0_10px_rgba(139,0,0,0.5)]" } }} />
             </div>
           </div>
         </header>
 
         {/* Content Body */}
-        <div className="p-8 lg:p-12 space-y-12 max-w-7xl mx-auto w-full">
+        <div className="p-4 md:p-8 lg:p-12 space-y-8 md:space-y-12 max-w-7xl mx-auto w-full">
           {/* Welcome Intro */}
-          <div className="space-y-4 text-center md:text-left">
-            <h2 className="font-headline-xl text-5xl text-on-surface uppercase tracking-widest opacity-90">
+          <div className="space-y-3 md:space-y-4 text-center md:text-left">
+            <h2 className="font-headline-xl text-3xl md:text-5xl text-on-surface uppercase tracking-widest opacity-90">
               Classified Archive
             </h2>
-            <p className="font-body-lg text-on-surface-variant/60 max-w-2xl leading-relaxed mx-auto md:mx-0">
+            <p className="font-body-lg text-on-surface-variant/60 max-w-2xl leading-relaxed mx-auto md:mx-0 text-sm md:text-base">
               Select an assigned evidence batch to proceed. Access is strictly compartmentalized based on current investigation progress and clearance verification.
             </p>
           </div>
@@ -215,7 +215,7 @@ export default function Dashboard() {
           <div className="relative z-10 w-full max-w-2xl bg-void-black border-2 border-blood-red p-8 md:p-12 shadow-[0_0_50px_rgba(220,20,60,0.3)] max-h-[90vh] overflow-y-auto custom-scrollbar">
             <div className="flex justify-between items-start mb-10 border-b-2 border-blood-red/20 pb-6">
               <div>
-                <h2 className="font-headline-xl text-4xl md:text-5xl text-on-surface tracking-widest uppercase">Access Request</h2>
+            <h2 className="font-headline-xl text-2xl md:text-4xl lg:text-5xl text-on-surface tracking-widest uppercase">Access Request</h2>
                 <p className="text-crimson-glare font-body-md uppercase mt-2 tracking-[0.2em]">Batch 0{selectedBatch} // Security Protocol 9</p>
               </div>
               <button onClick={() => setIsModalOpen(false)} className="text-on-surface/40 hover:text-white transition-colors">
@@ -253,7 +253,7 @@ export default function Dashboard() {
 
               <div className="space-y-4 pt-4 border-t border-blood-red/10">
                 <label className="block text-xs md:text-sm text-crimson-glare uppercase tracking-[0.3em] font-bold ml-1">Secret Access Code</label>
-                <input required name="accessCode" value={formData.accessCode} onChange={handleInputChange} type="password" className="w-full bg-blood-red/5 border-2 border-blood-red/50 p-6 font-headline-xl text-4xl text-crimson-glare focus:border-crimson-glare outline-none transition-all placeholder:text-blood-red/20 text-center tracking-[0.5em]" placeholder="********" />
+                <input required name="accessCode" value={formData.accessCode} onChange={handleInputChange} type="password" className="w-full bg-blood-red/5 border-2 border-blood-red/50 p-4 md:p-6 font-headline-xl text-2xl md:text-4xl text-crimson-glare focus:border-crimson-glare outline-none transition-all placeholder:text-blood-red/20 text-center tracking-[0.3em] md:tracking-[0.5em]" placeholder="********" />
                 <button
                   type="submit"
                   disabled={isPending}

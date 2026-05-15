@@ -25,7 +25,8 @@ export default function QuizPage() {
   const [loading, setLoading] = useState(true);
   const [qHints, setQHints] = useState<string[]>([]);
   const [pendingHintIndex, setPendingHintIndex] = useState<number | null>(null);
-  const [timeLeft, setTimeLeft] = useState<number | null>(null); // in seconds
+  const [timeLeft, setTimeLeft] = useState<number | null>(null);
+  const [alreadyCompleted, setAlreadyCompleted] = useState(false);
 
   const timestamp = new Date().getTime();
 
@@ -41,7 +42,8 @@ export default function QuizPage() {
           setQuestions(data.questions);
 
           if (data.is_completed) {
-            window.location.href = `/results/${id}`;
+            setAlreadyCompleted(true);
+            setLoading(false);
             return;
           }
 
@@ -118,7 +120,7 @@ export default function QuizPage() {
       });
 
       const data = await response.json();
-      setFeedback({ msg: data.message, isCorrect: data.is_correct });
+      setFeedback({ msg: 'ANALYSIS LOGGED', isCorrect: data.is_correct });
     } catch (err) {
       setFeedback({ msg: "TRANSMISSION ERROR", isCorrect: false });
     } finally {
@@ -186,13 +188,33 @@ export default function QuizPage() {
   };
 
   if (loading) return (
-    <div className="bg-black min-h-screen flex items-center justify-center font-mono text-blood-red tracking-widest uppercase">
+    <div className="bg-black min-h-screen flex items-center justify-center font-mono text-blood-red tracking-widest uppercase text-sm px-4 text-center">
       INITIALIZING TERMINAL...
     </div>
   );
 
+  if (alreadyCompleted) return (
+    <div className="bg-black min-h-screen flex flex-col items-center justify-center font-mono px-6 text-center gap-6">
+      <div className="text-blood-red text-xs tracking-[0.4em] uppercase font-bold animate-pulse">INVESTIGATION CONCLUDED</div>
+      <h2 className="text-white text-xl md:text-3xl uppercase tracking-widest font-bold">Evidence Already Submitted</h2>
+      <p className="text-on-surface-variant/60 text-sm max-w-md">Your team has already completed this batch. View your results below.</p>
+      <button
+        onClick={() => window.location.href = `/results/${id}`}
+        className="bg-blood-red text-white px-8 py-4 font-bold uppercase tracking-[0.2em] text-sm hover:bg-crimson-glare transition-all shadow-[0_0_20px_rgba(220,20,60,0.4)] active:scale-95"
+      >
+        VIEW RESULTS
+      </button>
+      <button
+        onClick={() => window.location.href = '/dashboard'}
+        className="text-on-surface-variant/40 hover:text-white text-xs uppercase tracking-widest transition-colors"
+      >
+        ← RETURN TO HUB
+      </button>
+    </div>
+  );
+
   if (questions.length === 0) return (
-    <div className="bg-black min-h-screen flex items-center justify-center font-mono text-on-surface-variant uppercase">
+    <div className="bg-black min-h-screen flex items-center justify-center font-mono text-on-surface-variant uppercase text-sm px-4 text-center">
       NO EVIDENCE DATA LOADED.
     </div>
   );
@@ -286,16 +308,16 @@ export default function QuizPage() {
           )}
 
           {/* Options / Terminal Input */}
-          <div className="grid grid-cols-1 gap-4 pt-4">
+          <div className="grid grid-cols-1 gap-3 md:gap-4 pt-4">
             {currentQ.options && currentQ.options.length > 0 ? (
               currentQ.options.map((option, idx) => (
                 <button
                   key={idx}
                   onClick={() => setSelectedOption(option)}
-                  className={`p-6 border-2 text-left transition-all group relative overflow-hidden ${selectedOption === option ? 'bg-blood-red/10 border-blood-red' : 'bg-white/5 border-white/10 hover:border-white/30'}`}
+                  className={`p-4 md:p-6 border-2 text-left transition-all group relative overflow-hidden ${selectedOption === option ? 'bg-blood-red/10 border-blood-red' : 'bg-white/5 border-white/10 hover:border-white/30'}`}
                 >
                   <div className={`absolute left-0 top-0 bottom-0 w-1 bg-blood-red transition-all duration-300 ${selectedOption === option ? 'opacity-100' : 'opacity-0'}`} />
-                  <span className={`text-lg uppercase tracking-widest transition-colors ${selectedOption === option ? 'text-white' : 'text-on-surface-variant group-hover:text-white'}`}>
+                  <span className={`text-sm md:text-lg uppercase tracking-wider md:tracking-widest transition-colors ${selectedOption === option ? 'text-white' : 'text-on-surface-variant group-hover:text-white'}`}>
                     {option}
                   </span>
                 </button>
@@ -342,20 +364,20 @@ export default function QuizPage() {
             )}
 
             {feedback && (
-              <div className={`text-center font-bold tracking-widest uppercase animate-slideUp ${feedback.isCorrect ? 'text-green-500 drop-shadow-[0_0_10px_rgba(34,197,94,0.5)]' : 'text-blood-red animate-shake'}`}>
+              <div className="text-center font-bold tracking-widest uppercase text-on-surface-variant/60 text-sm">
                 {feedback.msg}
               </div>
             )}
           </div>
 
           {/* Navigation */}
-          <div className="flex justify-between items-center pt-12 border-t border-white/10 mt-12 pb-12">
+          <div className="flex justify-between items-center pt-8 md:pt-12 border-t border-white/10 mt-8 md:mt-12 pb-8 md:pb-12">
             <button
               onClick={prevQuestion}
               disabled={currentIdx === 0}
-              className="px-8 py-4 bg-zinc-900 border border-white/10 text-on-surface-variant hover:text-white hover:border-white/30 uppercase tracking-[0.2em] font-bold flex items-center gap-3 transition-all disabled:opacity-5 active:scale-95 text-sm"
+              className="px-4 md:px-8 py-3 md:py-4 bg-zinc-900 border border-white/10 text-on-surface-variant hover:text-white hover:border-white/30 uppercase tracking-wider md:tracking-[0.2em] font-bold flex items-center gap-2 transition-all disabled:opacity-5 active:scale-95 text-xs md:text-sm"
             >
-              ← PREVIOUS
+              ← PREV
             </button>
             <div className="hidden md:block text-[10px] text-white/10 tracking-[0.5em] uppercase font-bold">
               SECURE DATA CHANNEL
@@ -363,9 +385,9 @@ export default function QuizPage() {
             <button
               onClick={nextQuestion}
               disabled={currentIdx === questions.length - 1}
-              className="px-8 py-4 bg-zinc-900 border border-blood-red/40 text-blood-red hover:text-white hover:bg-blood-red hover:border-blood-red uppercase tracking-[0.2em] font-bold flex items-center gap-3 transition-all disabled:opacity-5 active:scale-95 text-sm shadow-[0_0_20px_rgba(139,0,0,0.1)]"
+              className="px-4 md:px-8 py-3 md:py-4 bg-zinc-900 border border-blood-red/40 text-blood-red hover:text-white hover:bg-blood-red hover:border-blood-red uppercase tracking-wider md:tracking-[0.2em] font-bold flex items-center gap-2 transition-all disabled:opacity-5 active:scale-95 text-xs md:text-sm shadow-[0_0_20px_rgba(139,0,0,0.1)]"
             >
-              NEXT TRACK →
+              NEXT →
             </button>
           </div>
 

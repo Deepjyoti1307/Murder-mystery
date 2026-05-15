@@ -41,9 +41,9 @@ export default function LandingPage() {
       </header>
 
       {/* Main Content Canvas */}
-      <main className="flex-1 flex flex-col relative w-full pb-20 md:pb-0">
+      <main className="flex-1 flex flex-col relative w-full">
         {/* Hero Section */}
-        <section className="relative min-h-screen flex items-center justify-center overflow-hidden bg-void-black">
+        <section className="relative min-h-[100vh] flex items-center justify-center overflow-hidden bg-void-black pt-24 pb-32">
           {/* Background Image with Fog Overlay */}
           <div className="absolute inset-0 z-0 bg-cover bg-center" data-alt="A dark, cinematic scene with a blood-stained knife on the floor surrounded by heavy crimson fog." style={{ backgroundImage: "url('https://lh3.googleusercontent.com/aida-public/AB6AXuCNcx60Jfp1KdmECGFeWD1Wim72Vi6llJHHP3rwVMqMCaB-SAFy8VP7Pt2Es766nwjj8_p2Ft9TGjMgXRccbAW57a0kzkfpyZu8ApmjbBN3PA54lTpJSLb9HW398KFb1WtvGSzw5q5ce2qgpqJPAAG4w9ut3p1BUHkl0FhbVIyC6RhOahSw6q9uzYxJz7bp1hPpdr1WRIGNhGMG_HXr47wmaxa6OXxRP3IOmZZzCxadtWXN22N5Q3Ew5L1ioxiAplPUZJFmiEcyOJq1')" }}>
             <Scene />
@@ -83,7 +83,7 @@ export default function LandingPage() {
           <div className="absolute bottom-0 left-0 w-full h-32 bg-gradient-to-t from-blood-red/60 to-transparent z-10 pointer-events-none"></div>
         </section>
         {/* Footer */}
-        <footer className="absolute bottom-0 w-full bg-transparent py-8 px-4 flex flex-wrap justify-center items-center gap-x-4 gap-y-2 z-50">
+        <footer className="relative z-50 w-full bg-black/80 backdrop-blur-sm border-t border-blood-red/20 py-6 px-4 flex flex-wrap justify-center items-center gap-x-4 gap-y-2">
           <div className="text-tertiary font-body-md text-xs md:text-sm text-center tracking-wider">
             © 2026 TechTrix 2026. All rights reserved. Made with ❤️ by <span className="text-crimson-glare font-bold">Deepjyoti Dey</span>
           </div>

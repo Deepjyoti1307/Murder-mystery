@@ -38,7 +38,7 @@ interface Batch {
 }
 
 export default function AdminDashboard() {
-  const { user } = useUser();
+  const { user, isLoaded } = useUser();
   const [isAdmin, setIsAdmin] = useState(false);
   const [teams, setTeams] = useState<Team[]>([]);
   const [batches, setBatches] = useState<Batch[]>([]);
@@ -49,7 +49,22 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     const checkAdmin = async () => {
-      if (!user) return;
+      // 1. Check for Secret Key Token first (from /admin/login)
+      const authToken = localStorage.getItem('admin_auth_token');
+      if (authToken === 'ACCESS_GRANTED_2026') {
+        setIsAdmin(true);
+        fetchData();
+        return;
+      }
+
+      // 2. If no token, check Clerk user
+      if (!isLoaded) return;
+      if (!user) {
+        // If Clerk is loaded and no user, we can stop loading
+        setLoading(false);
+        return;
+      }
+
       try {
         const res = await fetch(`${API_BASE_URL}/api/admin/check?clerk_id=${user.id}`);
         const data = await res.json();
@@ -71,14 +86,15 @@ export default function AdminDashboard() {
       interval = setInterval(fetchData, 5000);
     }
     return () => { if (interval) clearInterval(interval); };
-  }, [user, isAdmin]);
+  }, [user, isLoaded, isAdmin]);
 
   const fetchData = async () => {
-    if (!user) return;
+    // We allow fetching if either Clerk user is admin OR secret token exists
+    const identifier = user?.id || localStorage.getItem('admin_auth_token') || "UNAUTHORIZED";
     try {
       const [tRes, bRes] = await Promise.all([
-        fetch(`${API_BASE_URL}/api/admin/teams?clerk_id=${user.id}`),
-        fetch(`${API_BASE_URL}/api/admin/batches?clerk_id=${user.id}`)
+        fetch(`${API_BASE_URL}/api/admin/teams?clerk_id=${identifier}`),
+        fetch(`${API_BASE_URL}/api/admin/batches?clerk_id=${identifier}`)
       ]);
       const tData = await tRes.json();
       const bData = await bRes.json();

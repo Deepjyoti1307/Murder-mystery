@@ -101,35 +101,18 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="Murder Mystery Backend", lifespan=lifespan)
 
 # Add CORS middleware to allow the frontend to communicate
-# NOTE: allow_credentials MUST be False if allow_origins is ["*"]
+allowed_origins_raw = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000")
+allowed_origins = [origin.strip() for origin in allowed_origins_raw.split(",") if origin.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=False,
+    allow_origins=allowed_origins,
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 # --- ENDPOINTS ---
-
-from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
-
-@app.exception_handler(RequestValidationError)
-async def validation_exception_handler(request, exc):
-    print(f"VALIDATION ERROR: {exc.errors()}")
-    return JSONResponse(
-        status_code=422,
-        content={"detail": exc.errors(), "body": exc.body},
-    )
-
-@app.exception_handler(HTTPException)
-async def http_exception_handler(request, exc):
-    print(f"HTTP ERROR {exc.status_code}: {exc.detail}")
-    return JSONResponse(
-        status_code=exc.status_code,
-        content={"detail": exc.detail},
-    )
 
 @app.get("/")
 async def root():
@@ -629,35 +612,34 @@ async def admin_login(secret: str):
         return {"status": "authorized", "token": "ACCESS_GRANTED_2026"} # Simple token for UI gating
     raise HTTPException(status_code=401, detail="INVALID ACCESS KEY")
 
+async def verify_admin(clerk_id: str):
+    # 1. Master Bypass Token (from Secret Key login)
+    if clerk_id == "ACCESS_GRANTED_2026":
+        return True
+    # 2. Hardcoded Admin ID
+    if clerk_id == "user_3DjX127kJgcAC7I2CgRnMOrtBD7":
+        return True
+    # 3. Database Check
+    admin = await User.find_one(User.clerk_id == clerk_id)
+    if admin and admin.is_admin:
+        return True
+    raise HTTPException(status_code=403, detail="ADMIN ACCESS REQUIRED.")
+
 @app.get("/api/admin/teams")
 async def admin_get_teams(clerk_id: str):
-    # Security check
-    if clerk_id != "user_3DjX127kJgcAC7I2CgRnMOrtBD7":
-        admin = await User.find_one(User.clerk_id == clerk_id)
-        if not admin or not admin.is_admin:
-            raise HTTPException(status_code=403, detail="ADMIN ACCESS REQUIRED.")
-        
+    await verify_admin(clerk_id)
     teams = await Team.find_all().to_list()
     return teams
 
 @app.get("/api/admin/batches")
 async def admin_get_batches(clerk_id: str):
-    # Security check
-    if clerk_id != "user_3DjX127kJgcAC7I2CgRnMOrtBD7":
-        admin = await User.find_one(User.clerk_id == clerk_id)
-        if not admin or not admin.is_admin:
-            raise HTTPException(status_code=403, detail="ADMIN ACCESS REQUIRED.")
-        
+    await verify_admin(clerk_id)
     batches = await Batch.find_all().to_list()
     return batches
 
 @app.get("/api/admin/batches/{batch_id}")
 async def admin_get_batch_detail(batch_id: int, clerk_id: str):
-    if clerk_id != "user_3DjX127kJgcAC7I2CgRnMOrtBD7":
-        admin = await User.find_one(User.clerk_id == clerk_id)
-        if not admin or not admin.is_admin:
-            raise HTTPException(status_code=403, detail="ADMIN ACCESS REQUIRED.")
-    
+    await verify_admin(clerk_id)
     batch = await Batch.find_one(Batch.batch_id == batch_id)
     if not batch:
         raise HTTPException(status_code=404, detail="BATCH NOT FOUND.")
@@ -665,11 +647,7 @@ async def admin_get_batch_detail(batch_id: int, clerk_id: str):
 
 @app.put("/api/admin/batches/{batch_id}")
 async def admin_update_batch(batch_id: int, clerk_id: str, batch_data: dict):
-    if clerk_id != "user_3DjX127kJgcAC7I2CgRnMOrtBD7":
-        admin = await User.find_one(User.clerk_id == clerk_id)
-        if not admin or not admin.is_admin:
-            raise HTTPException(status_code=403, detail="ADMIN ACCESS REQUIRED.")
-    
+    await verify_admin(clerk_id)
     batch = await Batch.find_one(Batch.batch_id == batch_id)
     if not batch:
         raise HTTPException(status_code=404, detail="BATCH NOT FOUND.")
@@ -686,11 +664,7 @@ async def admin_update_batch(batch_id: int, clerk_id: str, batch_data: dict):
 
 @app.post("/api/admin/batches/{batch_id}/toggle")
 async def admin_toggle_batch(batch_id: int, clerk_id: str):
-    if clerk_id != "user_3DjX127kJgcAC7I2CgRnMOrtBD7":
-        admin = await User.find_one(User.clerk_id == clerk_id)
-        if not admin or not admin.is_admin:
-            raise HTTPException(status_code=403, detail="ADMIN ACCESS REQUIRED.")
-    
+    await verify_admin(clerk_id)
     batch = await Batch.find_one(Batch.batch_id == batch_id)
     if not batch:
         raise HTTPException(status_code=404, detail="BATCH NOT FOUND.")
@@ -701,11 +675,7 @@ async def admin_toggle_batch(batch_id: int, clerk_id: str):
 
 @app.post("/api/admin/teams/{team_clerk_id}/reset")
 async def admin_reset_team(team_clerk_id: str, clerk_id: str, batch_id: int):
-    if clerk_id != "user_3DjX127kJgcAC7I2CgRnMOrtBD7":
-        admin = await User.find_one(User.clerk_id == clerk_id)
-        if not admin or not admin.is_admin:
-            raise HTTPException(status_code=403, detail="ADMIN ACCESS REQUIRED.")
-    
+    await verify_admin(clerk_id)
     team = await Team.find_one(Team.clerk_id == team_clerk_id, Team.batch_id == batch_id)
     if not team:
         raise HTTPException(status_code=404, detail="TEAM NOT FOUND.")

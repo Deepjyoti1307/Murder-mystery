@@ -112,6 +112,10 @@ app.add_middleware(
 
 # --- ENDPOINTS ---
 
+@app.get("/")
+async def root():
+    return {"message": "MURDER MYSTERY API LIVE", "version": "2.0.0"}
+
 @app.get("/api/health")
 async def health_check():
     return {"status": "ok", "timestamp": datetime.utcnow()}

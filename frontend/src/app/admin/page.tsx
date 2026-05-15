@@ -53,14 +53,14 @@ export default function AdminDashboard() {
       const authToken = localStorage.getItem('admin_auth_token');
       if (authToken === 'ACCESS_GRANTED_2026') {
         setIsAdmin(true);
-        fetchData();
+        await fetchData();
         return;
       }
 
       // 2. If no token, check Clerk user
       if (!isLoaded) return;
+      
       if (!user) {
-        // If Clerk is loaded and no user, we can stop loading
         setLoading(false);
         return;
       }

@@ -107,10 +107,13 @@ export default function AdminDashboard() {
     }
   };
 
+  const getAdminIdentifier = () => user?.id || localStorage.getItem('admin_auth_token') || '';
+
   const toggleBatch = async (batchId: number) => {
-    if (!user) return;
+    const identifier = getAdminIdentifier();
+    if (!identifier) return;
     try {
-      const res = await fetch(`${API_BASE_URL}/api/admin/batches/${batchId}/toggle?clerk_id=${user.id}`, {
+      const res = await fetch(`${API_BASE_URL}/api/admin/batches/${batchId}/toggle?clerk_id=${identifier}`, {
         method: 'POST'
       });
       if (res.ok) fetchData();
@@ -118,9 +121,10 @@ export default function AdminDashboard() {
   };
 
   const resetTeam = async (teamClerkId: string, batchId: number) => {
-    if (!user || !confirm("ARE YOU SURE YOU WANT TO RESET THIS TEAM?")) return;
+    const identifier = getAdminIdentifier();
+    if (!identifier || !confirm("ARE YOU SURE YOU WANT TO RESET THIS TEAM?")) return;
     try {
-      const res = await fetch(`${API_BASE_URL}/api/admin/teams/${teamClerkId}/reset?clerk_id=${user.id}&batch_id=${batchId}`, {
+      const res = await fetch(`${API_BASE_URL}/api/admin/teams/${teamClerkId}/reset?clerk_id=${identifier}&batch_id=${batchId}`, {
         method: 'POST'
       });
       if (res.ok) fetchData();
@@ -128,10 +132,11 @@ export default function AdminDashboard() {
   };
 
   const saveBatch = async () => {
-    if (!user || !editingBatch) return;
+    const identifier = getAdminIdentifier();
+    if (!identifier || !editingBatch) return;
     setIsSaving(true);
     try {
-      const res = await fetch(`${API_BASE_URL}/api/admin/batches/${editingBatch.batch_id}?clerk_id=${user.id}`, {
+      const res = await fetch(`${API_BASE_URL}/api/admin/batches/${editingBatch.batch_id}?clerk_id=${identifier}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(editingBatch)

@@ -180,6 +180,43 @@ export default function AdminDashboard() {
     el.click(); URL.revokeObjectURL(url);
   };
 
+  const exportAllTeamsCSV = () => {
+    const sorted = [...teams].sort((a, b) => b.total_score - a.total_score);
+    const headers = ['Rank', 'Team Name', 'Leader', 'College', 'Batch', 'Status', 'Score', 'Correct', 'Wrong', 'Progress', 'Time Taken'];
+    const rows = sorted.map((team, i) => {
+      const correct = team.answers.filter(a => a.is_correct).length;
+      const wrong = team.answers.length - correct;
+      let duration = '---';
+      if (team.start_time && team.end_time) {
+        const diff = (new Date(team.end_time).getTime() - new Date(team.start_time).getTime()) / 1000;
+        duration = `${Math.floor(diff / 60)}m ${Math.floor(diff % 60)}s`;
+      } else if (team.start_time) {
+        duration = 'IN PROGRESS';
+      }
+      return [
+        i + 1,
+        `"${team.team_name}"`,
+        `"${team.leader_name}"`,
+        `"${team.college_name}"`,
+        team.batch_id,
+        team.is_completed ? 'COMPLETED' : 'IN FIELD',
+        team.total_score,
+        correct,
+        wrong,
+        `Q${team.current_question}`,
+        duration,
+      ].join(',');
+    });
+    const csv = [headers.join(','), ...rows].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const el = document.createElement('a');
+    el.href = url;
+    el.download = `TechTrix2026_Standings_${new Date().toISOString().slice(0,10)}.csv`;
+    el.click();
+    URL.revokeObjectURL(url);
+  };
+
   const saveBatch = async () => {
     const identifier = getAdminIdentifier();
     if (!identifier || !editingBatch) return;
@@ -261,7 +298,16 @@ export default function AdminDashboard() {
       {/* Content */}
       <div className="animate-fadeIn">
         {activeTab === 'teams' ? (
-          <div className="overflow-x-auto">
+          <div>
+            <div className="flex justify-end mb-4">
+              <button
+                onClick={exportAllTeamsCSV}
+                className="flex items-center gap-2 px-6 py-3 bg-green-500/10 border border-green-500/40 text-green-500 hover:bg-green-500/20 text-[10px] font-bold uppercase tracking-widest transition-all"
+              >
+                <Download size={14} /> EXPORT ALL TEAMS CSV
+              </button>
+            </div>
+            <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="border-b border-white/5 text-on-surface-variant/40 text-xs tracking-[0.2em] uppercase font-bold">
@@ -351,6 +397,7 @@ export default function AdminDashboard() {
                 })}
               </tbody>
             </table>
+          </div>
           </div>
         ) : (
           <div className="space-y-24">

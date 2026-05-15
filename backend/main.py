@@ -101,16 +101,35 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="Murder Mystery Backend", lifespan=lifespan)
 
 # Add CORS middleware to allow the frontend to communicate
-allowed_origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000").split(",")
+# NOTE: allow_credentials MUST be False if allow_origins is ["*"]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=allowed_origins,
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 # --- ENDPOINTS ---
+
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request, exc):
+    print(f"VALIDATION ERROR: {exc.errors()}")
+    return JSONResponse(
+        status_code=422,
+        content={"detail": exc.errors(), "body": exc.body},
+    )
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request, exc):
+    print(f"HTTP ERROR {exc.status_code}: {exc.detail}")
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail},
+    )
 
 @app.get("/")
 async def root():

@@ -110,11 +110,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.api_route("/", methods=["GET", "HEAD"])
+async def root():
+    return {"status": "MURDER MYSTERY API ONLINE"}
+
+
 # --- ENDPOINTS ---
 
-@app.get("/")
-async def root():
-    return {"message": "MURDER MYSTERY API LIVE", "version": "2.0.0"}
 
 @app.get("/api/health")
 async def health_check():

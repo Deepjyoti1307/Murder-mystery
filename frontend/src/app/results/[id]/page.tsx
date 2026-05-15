@@ -82,7 +82,7 @@ export default function ResultsPage() {
           <h1 className="text-4xl md:text-6xl font-bold uppercase tracking-[0.2em] text-white drop-shadow-[0_0_20px_rgba(220,20,60,0.5)]">
             FINAL PERFORMANCE LOG
           </h1>
-          <p className="text-on-surface-variant/60 tracking-widest text-xs">
+          <p className="text-on-surface-variant/80 tracking-[0.3em] text-sm font-bold uppercase">
             TEAM: {results?.team_name || 'UNKNOWN OPERATIVES'} // BATCH ID: {id}
           </p>
         </div>
@@ -99,7 +99,7 @@ export default function ResultsPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
               <div className="space-y-6">
                 <div className="space-y-2">
-                  <span className="text-[10px] text-blood-red/80 font-bold uppercase tracking-widest">TOTAL SCORE</span>
+                  <span className="text-sm text-blood-red/80 font-bold uppercase tracking-[0.3em]">TOTAL SCORE</span>
                   <div className="text-7xl font-bold text-white flex items-baseline gap-2">
                     {results?.score}
                     <span className="text-2xl text-blood-red/40">/ {results?.max_score}</span>
@@ -108,22 +108,22 @@ export default function ResultsPage() {
 
                 <div className="flex flex-wrap gap-6 pt-4 border-t border-white/5">
                   <div className="space-y-1">
-                    <div className="flex items-center gap-2 text-[10px] text-on-surface-variant font-bold uppercase">
-                      <Clock size={12} className="text-blood-red" />
+                    <div className="flex items-center gap-2 text-xs text-on-surface-variant font-bold uppercase tracking-widest">
+                      <Clock size={14} className="text-blood-red" />
                       TIME
                     </div>
                     <div className="text-xl font-bold text-white tracking-widest">{results?.time_taken}</div>
                   </div>
                   <div className="space-y-1">
-                    <div className="flex items-center gap-2 text-[10px] text-on-surface-variant font-bold uppercase">
-                      <Target size={12} className="text-green-500" />
+                    <div className="flex items-center gap-2 text-xs text-on-surface-variant font-bold uppercase tracking-widest">
+                      <Target size={14} className="text-green-500" />
                       RESOLVED
                     </div>
                     <div className="text-xl font-bold text-white tracking-widest">{results?.correct} <span className="text-[10px] text-white/40">/ {results?.total}</span></div>
                   </div>
                   <div className="space-y-1">
-                    <div className="flex items-center gap-2 text-[10px] text-on-surface-variant font-bold uppercase">
-                      <AlertTriangle size={12} className="text-blood-red" />
+                    <div className="flex items-center gap-2 text-xs text-on-surface-variant font-bold uppercase tracking-widest">
+                      <AlertTriangle size={14} className="text-blood-red" />
                       DEDUCTION
                     </div>
                     <div className="text-xl font-bold text-white tracking-widest">
@@ -156,8 +156,8 @@ export default function ResultsPage() {
                   </PieChart>
                 </ResponsiveContainer>
                 <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                  <span className="text-xs text-white/40 font-bold">ACCURACY</span>
-                  <span className="text-2xl font-bold text-white">
+                  <span className="text-sm text-white/40 font-bold tracking-widest">ACCURACY</span>
+                  <span className="text-4xl font-bold text-white">
                     {results ? Math.round((results.correct / results.total) * 100) : 0}%
                   </span>
                 </div>
@@ -167,15 +167,15 @@ export default function ResultsPage() {
 
           {/* Tactical Summary */}
           <div className="bg-blood-red/10 border-2 border-blood-red/40 p-8 space-y-6 backdrop-blur-md">
-            <h3 className="text-sm font-bold uppercase tracking-[0.4em] text-blood-red border-b border-blood-red/20 pb-4">FIELD REPORT</h3>
+            <h3 className="text-lg font-bold uppercase tracking-[0.5em] text-blood-red border-b border-blood-red/40 pb-4">FIELD REPORT</h3>
             <div className="space-y-6">
-              <p className="text-xs text-on-surface-variant leading-relaxed italic uppercase">
-                "The analysis submitted by Team {results?.team_name} has been processed through the central mainframe. The decryption accuracy stands at {results ? Math.round((results.correct / results.total) * 100) : 0}%. Evidence recovery is in progress based on these findings."
+              <p className="text-base text-white/90 leading-relaxed font-bold tracking-wide">
+                "The analysis submitted by Team <span className="text-blood-red">{results?.team_name}</span> has been processed through the central mainframe. The decryption accuracy stands at {results ? Math.round((results.correct / results.total) * 100) : 0}%. Evidence recovery is in progress based on these findings."
               </p>
               <div className="pt-4 space-y-4">
                 <button
                   onClick={() => window.location.href = '/dashboard'}
-                  className="w-full bg-blood-red text-white py-4 font-bold uppercase tracking-widest text-[10px] hover:bg-crimson-glare transition-all shadow-[0_0_20px_rgba(220,20,60,0.3)]"
+                  className="w-full bg-blood-red text-white py-5 font-bold uppercase tracking-[0.3em] text-xs hover:bg-crimson-glare transition-all shadow-[0_0_30px_rgba(220,20,60,0.4)] border border-white/10"
                 >
                   RETURN TO DASHBOARD
                 </button>
@@ -191,7 +191,7 @@ export default function ResultsPage() {
               <h2 className="text-2xl font-bold uppercase tracking-widest text-white">LIVE LEADERBOARD</h2>
               <p className="text-[10px] text-on-surface-variant uppercase tracking-widest">Global Investigative Ranking</p>
             </div>
-            <div className="text-[10px] text-blood-red font-bold animate-pulse uppercase tracking-widest">
+            <div className="text-xs text-blood-red font-bold animate-pulse uppercase tracking-[0.3em]">
               SYNCED // REAL-TIME
             </div>
           </div>
@@ -200,11 +200,11 @@ export default function ResultsPage() {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="border-b border-white/10">
-                  <th className="py-4 px-4 text-[10px] text-on-surface-variant uppercase tracking-widest font-bold">RANK</th>
-                  <th className="py-4 px-4 text-[10px] text-on-surface-variant uppercase tracking-widest font-bold">TEAM</th>
-                  <th className="py-4 px-4 text-[10px] text-on-surface-variant uppercase tracking-widest font-bold">COLLEGE</th>
-                  <th className="py-4 px-4 text-[10px] text-on-surface-variant uppercase tracking-widest font-bold">SCORE</th>
-                  <th className="py-4 px-4 text-[10px] text-on-surface-variant uppercase tracking-widest font-bold text-right">TIME</th>
+                  <th className="py-4 px-4 text-xs text-on-surface-variant/60 uppercase tracking-widest font-bold">RANK</th>
+                  <th className="py-4 px-4 text-xs text-on-surface-variant/60 uppercase tracking-widest font-bold">TEAM</th>
+                  <th className="py-4 px-4 text-xs text-on-surface-variant/60 uppercase tracking-widest font-bold">COLLEGE</th>
+                  <th className="py-4 px-4 text-xs text-on-surface-variant/60 uppercase tracking-widest font-bold">SCORE</th>
+                  <th className="py-4 px-4 text-xs text-on-surface-variant/60 uppercase tracking-widest font-bold text-right">TIME</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5">
@@ -216,7 +216,7 @@ export default function ResultsPage() {
                       </div>
                     </td>
                     <td className="py-6 px-4">
-                      <span className={`text-sm font-bold uppercase tracking-widest ${entry.team_name === results?.team_name ? 'text-blood-red' : 'text-white'}`}>
+                      <span className={`text-base font-bold uppercase tracking-widest ${entry.team_name === results?.team_name ? 'text-blood-red' : 'text-white'}`}>
                         {entry.team_name}
                       </span>
                     </td>
@@ -224,11 +224,11 @@ export default function ResultsPage() {
                       {entry.college}
                     </td>
                     <td className="py-6 px-4">
-                      <span className="text-sm font-bold text-white">{entry.score}</span>
-                      <span className="text-[10px] text-on-surface-variant ml-1">PTS</span>
+                      <span className="text-base font-bold text-white">{entry.score}</span>
+                      <span className="text-xs text-on-surface-variant ml-1">PTS</span>
                     </td>
                     <td className="py-6 px-4 text-right">
-                      <span className="text-xs font-mono text-blood-red font-bold">{entry.duration_str}</span>
+                      <span className="text-sm font-mono text-blood-red font-bold">{entry.duration_str}</span>
                     </td>
                   </tr>
                 ))}

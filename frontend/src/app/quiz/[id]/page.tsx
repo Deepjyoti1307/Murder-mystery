@@ -81,15 +81,20 @@ export default function QuizPage() {
     const fetchHints = async () => {
       if (!user || !questions[currentIdx]) return;
       try {
-        const hResponse = await fetch(`${API_BASE_URL}/api/quiz/${id}/hints/${questions[currentIdx].id}?clerk_id=${user.id}&t=${new Date().getTime()}`, { cache: 'no-store' });
+        const qId = questions[currentIdx].id;
+        const hResponse = await fetch(`${API_BASE_URL}/api/quiz/${id}/hints/${qId}?clerk_id=${user.id}&t=${new Date().getTime()}`, { cache: 'no-store' });
         const hData = await hResponse.json();
-        if (hResponse.ok) setQHints(hData.hints || []);
-      } catch (err) { }
+        if (hResponse.ok) {
+          setQHints(hData.hints || []);
+        }
+      } catch (err) {
+        console.error("FAILED TO FETCH INTEL HINTS.");
+      }
     };
     fetchHints();
     setSelectedOption('');
     setFeedback(null);
-  }, [currentIdx, user, questions]);
+  }, [currentIdx, user, questions, id]);
 
   const handleSubmit = async () => {
     if (!selectedOption || !user) return;
@@ -122,23 +127,31 @@ export default function QuizPage() {
   };
 
   const handleRequestHint = async () => {
-    if (!user || pendingHintIndex === null) return;
+    if (!user || pendingHintIndex === null || !questions[currentIdx]) return;
+    
+    const qId = questions[currentIdx].id;
     try {
       const response = await fetch(`${API_BASE_URL}/api/quiz/${id}/hints/reveal`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           clerk_id: user.id,
-          question_id: questions[currentIdx].id,
-          hint_index: pendingHintIndex
+          question_id: qId
         })
       });
+      
       const data = await response.json();
       if (response.ok) {
         setQHints(prev => [...prev, data.hint]);
         setPendingHintIndex(null);
+      } else {
+        alert(data.detail || "DECRYPTION FAILED.");
+        setPendingHintIndex(null);
       }
-    } catch (err) { }
+    } catch (err) {
+      alert("TERMINAL ERROR: HINT UNAVAILABLE.");
+      setPendingHintIndex(null);
+    }
   };
 
   const handleFinish = async () => {
@@ -221,52 +234,52 @@ export default function QuizPage() {
 
           {/* Question & Hint Buttons Header */}
           <div className="space-y-6">
-            <div className="flex flex-col md:flex-row justify-between items-start gap-4 md:gap-6">
-              <div className="flex-1 space-y-4">
+            <div className="flex flex-col gap-4 md:gap-6">
+              <div className="space-y-4">
                 <span className="text-blood-red text-xs font-bold uppercase tracking-[0.4em]">Question {currentQ.id} of {questions.length}</span>
                 <h2 className="text-xl md:text-3xl text-on-surface uppercase tracking-widest leading-relaxed">
                   {currentQ.text}
                 </h2>
               </div>
 
-              {/* Tactical Hint Buttons */}
-              <div className="flex flex-row md:flex-col gap-3 pt-2 md:pt-6 min-w-[60px] w-full md:w-auto overflow-x-auto pb-2 md:pb-0">
-                {Array.from({ length: totalHintsAvailable }).map((_, idx) => {
-                  const hintNum = idx + 1;
-                  const isRevealed = qHints.length >= hintNum;
-                  return (
-                    <div key={hintNum} className="relative group">
-                      <button
-                        onClick={() => !isRevealed && setPendingHintIndex(hintNum)}
-                        disabled={isRevealed}
-                        className={`w-14 h-14 border-2 flex items-center justify-center text-sm font-bold transition-all ${isRevealed ? 'bg-blood-red border-blood-red text-white shadow-[0_0_15px_rgba(220,20,60,0.4)]' : 'border-white/20 text-white/40 hover:border-blood-red hover:text-blood-red'}`}
-                      >
-                        H{hintNum}
-                      </button>
-
-                      {pendingHintIndex === hintNum && (
-                        <div className="absolute right-full mr-4 top-0 bg-zinc-900 p-4 z-50 flex flex-col gap-3 items-center shadow-2xl animate-slideLeft border-2 border-blood-red min-w-[140px]">
-                          <span className="text-xs text-white font-bold tracking-widest whitespace-nowrap uppercase">REVEAL HINT?</span>
-                          <div className="flex gap-2 w-full">
-                            <button onClick={handleRequestHint} className="flex-1 bg-blood-red text-white py-3 text-xs font-bold hover:bg-crimson-glare transition-colors">YES</button>
-                            <button onClick={() => setPendingHintIndex(null)} className="flex-1 bg-white/10 text-white py-3 text-xs font-bold hover:bg-white/20 transition-colors">NO</button>
+              {/* Hint Buttons - inline row */}
+              {totalHintsAvailable > 0 && (
+                <div className="flex flex-wrap gap-3 items-center">
+                  {Array.from({ length: totalHintsAvailable }).map((_, idx) => {
+                    const hintNum = idx + 1;
+                    const isRevealed = qHints.length >= hintNum;
+                    const isPending = pendingHintIndex === hintNum;
+                    return (
+                      <div key={hintNum} className="flex items-center gap-2">
+                        <button
+                          onClick={() => !isRevealed && setPendingHintIndex(isPending ? null : hintNum)}
+                          disabled={isRevealed}
+                          className={`w-14 h-14 border-2 flex items-center justify-center text-sm font-bold transition-all ${isRevealed ? 'bg-blood-red border-blood-red text-white shadow-[0_0_15px_rgba(220,20,60,0.4)]' : isPending ? 'border-blood-red text-blood-red bg-blood-red/10' : 'border-white/20 text-white/40 hover:border-blood-red hover:text-blood-red'}`}
+                        >
+                          H{hintNum}
+                        </button>
+                        {isPending && (
+                          <div className="flex items-center gap-2 bg-zinc-900 border-2 border-blood-red p-2 px-3">
+                            <span className="text-[10px] text-white font-bold tracking-widest uppercase whitespace-nowrap">REVEAL? (-2pts)</span>
+                            <button onClick={handleRequestHint} className="bg-blood-red text-white px-4 py-2 text-xs font-bold hover:bg-crimson-glare transition-colors uppercase">YES</button>
+                            <button onClick={() => setPendingHintIndex(null)} className="bg-white/10 text-white px-4 py-2 text-xs font-bold hover:bg-white/20 transition-colors uppercase">NO</button>
                           </div>
-                        </div>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
             </div>
           </div>
 
           {/* Revealed Hint Display */}
           {qHints.length > 0 && (
-            <div className="space-y-3 animate-slideUp">
+            <div className="space-y-3">
               {qHints.map((hint, idx) => (
-                <div key={idx} className="bg-zinc-900/50 border-l-2 border-blood-red p-4 flex gap-4 items-start shadow-[0_4px_20px_rgba(0,0,0,0.4)]">
-                  <div className="bg-blood-red text-white text-[10px] px-1.5 py-0.5 font-bold shrink-0">H{idx + 1}</div>
-                  <p className="text-xs text-crimson-glare/90 leading-relaxed tracking-wider uppercase italic">{hint}</p>
+                <div key={idx} className="bg-zinc-900/80 border-l-4 border-blood-red p-5 flex gap-4 items-start shadow-[0_4px_20px_rgba(0,0,0,0.4)]">
+                  <div className="bg-blood-red text-white text-[10px] px-2 py-1 font-bold shrink-0 tracking-wider">H{idx + 1}</div>
+                  <p className="text-sm text-crimson-glare leading-relaxed tracking-wider uppercase font-bold">{hint}</p>
                 </div>
               ))}
             </div>

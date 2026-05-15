@@ -17,6 +17,7 @@ export default function Dashboard() {
   const [selectedBatch, setSelectedBatch] = useState<number | null>(null);
   const [formData, setFormData] = useState({
     teamName: '',
+    teamId: '',
     leaderName: '',
     phoneNumber: '',
     collegeName: '',
@@ -50,6 +51,7 @@ export default function Dashboard() {
         },
         body: JSON.stringify({
           team_name: formData.teamName,
+          team_id: formData.teamId,
           leader_name: formData.leaderName,
           phone_number: formData.phoneNumber,
           college_name: formData.collegeName,
@@ -222,9 +224,15 @@ export default function Dashboard() {
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-8">
-              <div className="space-y-3">
-                <label className="block text-xs md:text-sm text-on-surface-variant/60 uppercase tracking-[0.3em] font-bold ml-1">Team Name</label>
-                <input required name="teamName" value={formData.teamName} onChange={handleInputChange} className="w-full bg-black/40 border-2 border-blood-red/30 p-5 font-body-lg text-xl text-white focus:border-crimson-glare outline-none transition-all placeholder:text-white/10 uppercase tracking-widest" placeholder="ENTER IDENTIFIER..." />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="space-y-3">
+                  <label className="block text-xs md:text-sm text-on-surface-variant/60 uppercase tracking-[0.3em] font-bold ml-1">Team Name</label>
+                  <input required name="teamName" value={formData.teamName} onChange={handleInputChange} className="w-full bg-black/40 border-2 border-blood-red/30 p-5 font-body-lg text-xl text-white focus:border-crimson-glare outline-none transition-all placeholder:text-white/10 uppercase tracking-widest" placeholder="NAME..." />
+                </div>
+                <div className="space-y-3">
+                  <label className="block text-xs md:text-sm text-on-surface-variant/60 uppercase tracking-[0.3em] font-bold ml-1">Team ID</label>
+                  <input required name="teamId" value={formData.teamId} onChange={handleInputChange} className="w-full bg-black/40 border-2 border-blood-red/30 p-5 font-body-lg text-xl text-white focus:border-crimson-glare outline-none transition-all placeholder:text-white/10 uppercase tracking-widest" placeholder="ID..." />
+                </div>
               </div>
 
               <div className="grid grid-cols-1 gap-8">

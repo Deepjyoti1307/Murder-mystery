@@ -28,6 +28,7 @@ class User(Document):
 class Team(Document):
     clerk_id: str
     team_name: str
+    team_id: Optional[str] = None
     leader_name: str
     phone_number: str
     college_name: str
@@ -57,6 +58,7 @@ class Batch(Document):
 
 class AccessRequest(BaseModel):
     team_name: str
+    team_id: str
     leader_name: str
     phone_number: str
     college_name: str
@@ -128,6 +130,7 @@ async def enter_batch(batch_id: int, request: AccessRequest):
     team = await Team.find_one(Team.clerk_id == request.clerk_id, Team.batch_id == batch_id)
     if team:
         team.team_name = request.team_name
+        team.team_id = request.team_id
         team.leader_name = request.leader_name
         team.phone_number = request.phone_number
         team.college_name = request.college_name
@@ -136,10 +139,12 @@ async def enter_batch(batch_id: int, request: AccessRequest):
         team = Team(
             clerk_id=request.clerk_id,
             team_name=request.team_name,
+            team_id=request.team_id,
             leader_name=request.leader_name,
             phone_number=request.phone_number,
             college_name=request.college_name,
-            batch_id=batch_id
+            batch_id=batch_id,
+            entry_timestamp=datetime.utcnow()
         )
         await team.insert()
 
@@ -246,34 +251,52 @@ async def get_revealed_hints(batch_id: int, question_id: int, clerk_id: str):
         return {"hints": []}
     
     batch = await Batch.find_one(Batch.batch_id == batch_id)
-    question = next((q for q in batch.questions if q["id"] == question_id), None)
-    if not question:
+    if not batch:
         return {"hints": []}
         
-    ans_entry = next((a for a in team.answers if a["q_id"] == question_id), None)
+    question = next((q for q in batch.questions if q.get("id") == question_id), None)
+    if not question:
+        return {"hints": []}
+
+    ans_entry = next((a for a in team.answers if a.get("q_id") == question_id), None)
     count = ans_entry.get("hints_used", 0) if ans_entry else 0
     
-    return {"hints": question["hints"][:count]}
+    hints_list = question.get("hints", [])
+    return {"hints": hints_list[:count]}
 
 @app.post("/api/quiz/{batch_id}/hints/reveal")
 async def reveal_hint(batch_id: int, request: HintRequest):
+    print(f"DEBUG: Hint reveal request for {request.clerk_id}, Q{request.question_id}")
     team = await Team.find_one(Team.clerk_id == request.clerk_id, Team.batch_id == batch_id)
     if not team:
         raise HTTPException(status_code=404, detail="TEAM NOT FOUND.")
     
     batch = await Batch.find_one(Batch.batch_id == batch_id)
-    question = next((q for q in batch.questions if q["id"] == request.question_id), None)
-    if not question or not question["hints"]:
-         raise HTTPException(status_code=400, detail="NO HINTS AVAILABLE FOR THIS QUESTION.")
+    if not batch:
+         raise HTTPException(status_code=404, detail="BATCH NOT FOUND.")
 
-    existing_entry = next((a for a in team.answers if a["q_id"] == request.question_id), None)
+    question = next((q for q in batch.questions if q.get("id") == request.question_id), None)
+    if not question:
+         raise HTTPException(status_code=400, detail="QUESTION NOT FOUND IN BATCH.")
+
+    hints_list = question.get("hints", [])
+    if not hints_list:
+          raise HTTPException(status_code=400, detail="NO HINTS AVAILABLE FOR THIS QUESTION.")
+
+    # Find or create answer entry
+    existing_entry = None
+    for a in team.answers:
+        if a.get("q_id") == request.question_id:
+            existing_entry = a
+            break
+
     hints_count = existing_entry.get("hints_used", 0) if existing_entry else 0
     
-    if hints_count >= len(question["hints"]):
+    if hints_count >= len(hints_list):
         raise HTTPException(status_code=400, detail="ALL HINTS ALREADY DECRYPTED.")
 
     new_hints_count = hints_count + 1
-    hint_to_reveal = question["hints"][hints_count]
+    hint_to_reveal = hints_list[hints_count]
 
     if existing_entry:
         existing_entry["hints_used"] = new_hints_count
@@ -285,14 +308,21 @@ async def reveal_hint(batch_id: int, request: HintRequest):
             "hints_used": new_hints_count,
             "timestamp": datetime.utcnow().isoformat()
         })
+
+    # Crucial: Re-assign list to ensure Beanie/Motor detects the nested change
+    team.answers = list(team.answers)
+    
+    # Calculate penalty
+    penalty = -2 if new_hints_count == 1 else -4
+    team.total_score += penalty
     
     await team.save()
-    penalty = -2 if new_hints_count == 1 else -4
+    print(f"DEBUG: Hint revealed: {hint_to_reveal[:20]}... New count: {new_hints_count}")
+    
     return {
         "hint": hint_to_reveal, 
         "hints_used": new_hints_count, 
-        "penalty": penalty,
-        "message": f"HINT DECRYPTED. PENALTY: {penalty} POINTS."
+        "total_score": team.total_score
     }
 
 @app.get("/api/quiz/{batch_id}/progress")
@@ -588,13 +618,47 @@ async def admin_get_teams(clerk_id: str):
 
 @app.get("/api/admin/batches")
 async def admin_get_batches(clerk_id: str):
+    # Security check
+    if clerk_id != "user_3DjX127kJgcAC7I2CgRnMOrtBD7":
+        admin = await User.find_one(User.clerk_id == clerk_id)
+        if not admin or not admin.is_admin:
+            raise HTTPException(status_code=403, detail="ADMIN ACCESS REQUIRED.")
+        
+    batches = await Batch.find_all().to_list()
+    return batches
+
+@app.get("/api/admin/batches/{batch_id}")
+async def admin_get_batch_detail(batch_id: int, clerk_id: str):
     if clerk_id != "user_3DjX127kJgcAC7I2CgRnMOrtBD7":
         admin = await User.find_one(User.clerk_id == clerk_id)
         if not admin or not admin.is_admin:
             raise HTTPException(status_code=403, detail="ADMIN ACCESS REQUIRED.")
     
-    batches = await Batch.find_all().to_list()
-    return batches
+    batch = await Batch.find_one(Batch.batch_id == batch_id)
+    if not batch:
+        raise HTTPException(status_code=404, detail="BATCH NOT FOUND.")
+    return batch
+
+@app.put("/api/admin/batches/{batch_id}")
+async def admin_update_batch(batch_id: int, clerk_id: str, batch_data: dict):
+    if clerk_id != "user_3DjX127kJgcAC7I2CgRnMOrtBD7":
+        admin = await User.find_one(User.clerk_id == clerk_id)
+        if not admin or not admin.is_admin:
+            raise HTTPException(status_code=403, detail="ADMIN ACCESS REQUIRED.")
+    
+    batch = await Batch.find_one(Batch.batch_id == batch_id)
+    if not batch:
+        raise HTTPException(status_code=404, detail="BATCH NOT FOUND.")
+    
+    if "codeword" in batch_data:
+        batch.codeword = batch_data["codeword"]
+    if "story_content" in batch_data:
+        batch.story_content = batch_data["story_content"]
+    if "questions" in batch_data:
+        batch.questions = batch_data["questions"]
+    
+    await batch.save()
+    return {"status": "success", "message": "BATCH DATA SYNCHRONIZED."}
 
 @app.post("/api/admin/batches/{batch_id}/toggle")
 async def admin_toggle_batch(batch_id: int, clerk_id: str):

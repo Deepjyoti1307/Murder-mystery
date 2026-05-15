@@ -31,7 +31,7 @@ export default function LandingPage() {
             <Shield size={12} className="text-blood-red" />
             ADMIN
           </Link>
-          <Link href="/team" className="hidden sm:block text-on-surface hover:text-white bg-blood-red/20 hover:bg-blood-red px-4 md:px-8 py-2 md:py-2.5 border border-blood-red/40 text-[10px] md:text-xs font-bold uppercase tracking-wider md:tracking-[0.2em] transition-all shadow-[0_0_15px_rgba(220,20,60,0.2)] rounded-full">
+          <Link href="/team" className="text-on-surface hover:text-white bg-blood-red/20 hover:bg-blood-red px-4 md:px-8 py-2 md:py-2.5 border border-blood-red/40 text-[10px] md:text-xs font-bold uppercase tracking-wider md:tracking-[0.2em] transition-all shadow-[0_0_15px_rgba(220,20,60,0.2)] rounded-full hidden sm:block">
             KNOW THE TEAM
           </Link>
           <SignedIn>
@@ -95,23 +95,19 @@ export default function LandingPage() {
         </footer>
       </main>
       {/* BottomNavBar (Mobile) */}
-      <nav className="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center h-16 bg-black/90 backdrop-blur-md lg:hidden bg-surface-container-lowest dark:bg-surface-container-lowest bg-void-black border-t-2 border-blood-red shadow-[0_-4px_20px_rgba(220,20,60,0.2)]">
-        <a className="flex flex-col items-center justify-center text-crimson-glare scale-110 drop-shadow-hazard-glow" href="#">
-          <span className="material-symbols-outlined">inventory_2</span>
-          <span className="font-label-sm text-label-sm mt-1">Files</span>
-        </a>
-        <a className="flex flex-col items-center justify-center text-on-tertiary-container opacity-60 hover:opacity-100 hover:text-crimson-glare" href="#">
-          <span className="material-symbols-outlined">enhanced_encryption</span>
-          <span className="font-label-sm text-label-sm mt-1">Vault</span>
-        </a>
-        <a className="flex flex-col items-center justify-center text-on-tertiary-container opacity-60 hover:opacity-100 hover:text-crimson-glare" href="#">
-          <span className="material-symbols-outlined">location_searching</span>
-          <span className="font-label-sm text-label-sm mt-1">Map</span>
-        </a>
-        <a className="flex flex-col items-center justify-center text-on-tertiary-container opacity-60 hover:opacity-100 hover:text-crimson-glare" href="#">
-          <span className="material-symbols-outlined">history_edu</span>
-          <span className="font-label-sm text-label-sm mt-1">Log</span>
-        </a>
+      <nav className="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center h-14 bg-black/95 backdrop-blur-md lg:hidden border-t-2 border-blood-red shadow-[0_-4px_20px_rgba(220,20,60,0.2)]">
+        <Link href="/" className="flex flex-col items-center justify-center text-crimson-glare">
+          <span className="material-symbols-outlined text-xl">home</span>
+          <span className="text-[9px] mt-0.5 uppercase tracking-wider font-bold">Home</span>
+        </Link>
+        <Link href="/team" className="flex flex-col items-center justify-center text-on-surface-variant/60 hover:text-crimson-glare transition-colors">
+          <span className="material-symbols-outlined text-xl">groups</span>
+          <span className="text-[9px] mt-0.5 uppercase tracking-wider font-bold">Team</span>
+        </Link>
+        <Link href="/admin/login" className="flex flex-col items-center justify-center text-on-surface-variant/60 hover:text-crimson-glare transition-colors">
+          <span className="material-symbols-outlined text-xl">admin_panel_settings</span>
+          <span className="text-[9px] mt-0.5 uppercase tracking-wider font-bold">Admin</span>
+        </Link>
       </nav>
 
     </div>

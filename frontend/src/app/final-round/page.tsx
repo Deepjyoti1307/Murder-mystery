@@ -75,17 +75,19 @@ function RiddleModal({ onClose, onSolve }: { onClose: () => void; onSolve: () =>
   const [answer, setAnswer] = useState('');
   const [error, setError] = useState('');
   const [shake, setShake] = useState(false);
+  const [solved, setSolved] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { inputRef.current?.focus(); }, []);
 
-  const RIDDLE = `ত্রিনয়ন ও ত্রিনয়ন এট্টু জিরো`;
+  const RIDDLE = `"Sleepy minds come here to revive,\nWith steaming cups that keep brains alive.\nFollow the aroma drifting in air —\nThe red sign will lead you there."`;
 
-  const CORRECT_ANSWER = '39039820';
+  const CORRECT_ANSWER = 'nescafe';
 
   const handleSubmit = () => {
-    const cleaned = answer.trim();
+    const cleaned = answer.trim().toLowerCase();
     if (cleaned === CORRECT_ANSWER) {
+      setSolved(true);
       onSolve();
     } else {
       setError('INCORRECT. ANALYSE THE EVIDENCE AGAIN.');
@@ -98,61 +100,66 @@ function RiddleModal({ onClose, onSolve }: { onClose: () => void; onSolve: () =>
   return (
     <div className="fixed inset-0 z-[300] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/95 backdrop-blur-md" onClick={onClose} />
-      <div className={`relative bg-zinc-950 border-2 border-blood-red/60 w-full max-w-xl shadow-[0_0_80px_rgba(220,20,60,0.35)] ${shake ? '' : ''}`}
+      <div className={`relative bg-zinc-950 border-2 border-blood-red/60 w-full max-w-xl shadow-[0_0_80px_rgba(220,20,60,0.35)]`}
         style={shake ? { animation: 'shake 0.3s ease-in-out' } : {}}>
 
-        {/* Top accent */}
         <div className="h-[2px] w-full bg-gradient-to-r from-transparent via-crimson-glare to-transparent" />
-
-        {/* Scanline overlay */}
         <div className="absolute inset-0 pointer-events-none opacity-[0.03]"
           style={{ backgroundImage: 'repeating-linear-gradient(0deg, rgba(255,255,255,0.8) 0px, rgba(255,255,255,0.8) 1px, transparent 1px, transparent 4px)' }} />
 
         <div className="p-8 md:p-10">
-          {/* Header */}
-          <div className="flex items-center gap-2 mb-1">
-            <div className="w-1.5 h-1.5 rounded-full bg-blood-red animate-pulse" />
-            <div className="text-xs text-blood-red font-bold tracking-[0.4em] uppercase">Encrypted Cipher Unlocked</div>
-          </div>
-          <h2 className="text-2xl md:text-3xl font-bold text-white tracking-widest uppercase mb-8">Solve The Riddle</h2>
+          {!solved ? (
+            <>
+              <div className="flex items-center gap-2 mb-1">
+                <div className="w-1.5 h-1.5 rounded-full bg-blood-red animate-pulse" />
+                <div className="text-xs text-blood-red font-bold tracking-[0.4em] uppercase">Encrypted Cipher Unlocked</div>
+              </div>
+              <h2 className="text-2xl md:text-3xl font-bold text-white tracking-widest uppercase mb-8">Solve The Riddle</h2>
 
-          {/* Riddle box */}
-          <div className="bg-black/70 border border-blood-red/20 px-8 py-7 mb-8 relative">
-            <div className="absolute top-0 left-0 w-4 h-4 border-t border-l border-blood-red/40" />
-            <div className="absolute bottom-0 right-0 w-4 h-4 border-b border-r border-blood-red/40" />
-            <p className="font-mono text-xl md:text-2xl text-amber-200/90 leading-relaxed tracking-wide">
-              {RIDDLE}
-            </p>
-          </div>
+              <div className="bg-black/70 border border-blood-red/20 px-8 py-7 mb-8 relative">
+                <div className="absolute top-0 left-0 w-4 h-4 border-t border-l border-blood-red/40" />
+                <div className="absolute bottom-0 right-0 w-4 h-4 border-b border-r border-blood-red/40" />
+                <p className="font-mono text-lg md:text-xl text-amber-200/90 leading-relaxed tracking-wide whitespace-pre-line">
+                  {RIDDLE}
+                </p>
+              </div>
 
-          <div className="space-y-4">
-            <input
-              ref={inputRef}
-              type="text"
-              value={answer}
-              onChange={e => { setAnswer(e.target.value); setError(''); }}
-              onKeyDown={e => e.key === 'Enter' && handleSubmit()}
-              placeholder="Type your answer..."
-              className="w-full bg-zinc-900/80 border border-white/15 focus:border-blood-red text-white text-lg px-5 py-4 outline-none tracking-widest placeholder:text-white/20 transition-all rounded-sm"
-            />
-            {error && (
-              <div className="text-blood-red text-sm font-bold tracking-widest animate-pulse">{error}</div>
-            )}
-            <div className="flex gap-3 pt-1">
-              <button
-                onClick={onClose}
-                className="flex-1 py-3.5 border border-white/10 text-white/40 hover:text-white text-sm font-bold uppercase tracking-widest transition-all rounded-full"
-              >
-                Close
-              </button>
-              <button
-                onClick={handleSubmit}
-                className="flex-1 py-3.5 bg-blood-red hover:bg-crimson-glare text-white text-sm font-bold uppercase tracking-widest transition-all shadow-[0_0_20px_rgba(220,20,60,0.4)] rounded-full"
-              >
-                Submit Answer
+              <div className="space-y-4">
+                <input
+                  ref={inputRef}
+                  type="text"
+                  value={answer}
+                  onChange={e => { setAnswer(e.target.value); setError(''); }}
+                  onKeyDown={e => e.key === 'Enter' && handleSubmit()}
+                  placeholder="Type your answer..."
+                  className="w-full bg-zinc-900/80 border border-white/15 focus:border-blood-red text-white text-lg px-5 py-4 outline-none tracking-widest placeholder:text-white/20 transition-all rounded-sm"
+                />
+                {error && (
+                  <div className="text-blood-red text-sm font-bold tracking-widest animate-pulse">{error}</div>
+                )}
+                <div className="flex gap-3 pt-1">
+                  <button onClick={onClose} className="flex-1 py-3.5 border border-white/10 text-white/40 hover:text-white text-sm font-bold uppercase tracking-widest transition-all rounded-full">Close</button>
+                  <button onClick={handleSubmit} className="flex-1 py-3.5 bg-blood-red hover:bg-crimson-glare text-white text-sm font-bold uppercase tracking-widest transition-all shadow-[0_0_20px_rgba(220,20,60,0.4)] rounded-full">Submit Answer</button>
+                </div>
+              </div>
+            </>
+          ) : (
+            <div className="text-center py-6">
+              <div className="text-green-500 text-sm font-bold tracking-[0.5em] uppercase mb-3 animate-pulse">✓ CIPHER CRACKED</div>
+              <div className="text-white/40 text-xs tracking-widest uppercase mb-8">Present this code to the QR checkpoint</div>
+
+              <div className="bg-black/80 border-2 border-green-500/40 px-10 py-10 mb-8 shadow-[0_0_40px_rgba(34,197,94,0.2)]">
+                <div className="text-xs text-green-500/60 tracking-[0.4em] uppercase mb-3">Your Access Code</div>
+                <div className="text-5xl md:text-6xl font-bold text-green-400 tracking-[0.4em] font-mono" style={{ textShadow: '0 0 30px rgba(34,197,94,0.6)' }}>
+                  FIST
+                </div>
+              </div>
+
+              <button onClick={onClose} className="px-10 py-4 border border-green-500/40 text-green-500 hover:bg-green-500/10 text-sm font-bold uppercase tracking-widest transition-all rounded-full">
+                Continue Investigation
               </button>
             </div>
-          </div>
+          )}
         </div>
       </div>
     </div>
@@ -227,6 +234,7 @@ export default function FinalRoundPage() {
 
   // Modal states
   const [showRiddle, setShowRiddle] = useState(false);
+  const [showFinalRiddle, setShowFinalRiddle] = useState(false);
   const [showWeapon, setShowWeapon] = useState(false);
 
   // Hidden button: visible after scrolling 60% of page
@@ -275,7 +283,6 @@ export default function FinalRoundPage() {
   }, [loading]);
 
   const handleSolve = async () => {
-    setShowRiddle(false);
     // Record this team as a solver in the DB
     if (user && teamInfo) {
       try {
@@ -291,8 +298,13 @@ export default function FinalRoundPage() {
             college_name: teamInfo.college_name,
           })
         });
-      } catch (e) { /* silent fail — don't block reveal */ }
+      } catch (e) { /* silent fail */ }
     }
+    // Don't auto-show weapon — the final hidden riddle gates it
+  };
+
+  const handleFinalSolve = () => {
+    setShowFinalRiddle(false);
     setTimeout(() => setShowWeapon(true), 300);
   };
 
@@ -366,11 +378,28 @@ export default function FinalRoundPage() {
             </div>
           </div>
 
-          <div className="mt-12 pt-8 border-t border-blood-red/10 flex justify-between items-end opacity-40">
-            <div className="font-body-sm text-[10px] uppercase tracking-widest">TechTrix 2026 // Classified Archive</div>
-            <div className="text-right">
-              <p className="text-[8px] uppercase tracking-tighter">Authorized by</p>
-              <p className="font-headline-md text-sm">ARCHIVIST PRIME</p>
+          {/* ── Hidden in Plain Sight — The Final Clue ── */}
+          <div className="mt-12 pt-8 border-t border-blood-red/10 flex flex-col gap-6">
+            <div className="flex justify-between items-end opacity-40">
+              <div className="font-body-sm text-[10px] uppercase tracking-widest">TechTrix 2026 // Classified Archive</div>
+              <div className="text-right">
+                <p className="text-[8px] uppercase tracking-tighter">Authorized by</p>
+                <p className="font-headline-md text-sm">ARCHIVIST PRIME</p>
+              </div>
+            </div>
+
+            {/* THE HIDDEN CLUE — looks like decorative footer text but IS the final puzzle */}
+            <div
+              onClick={() => setShowFinalRiddle(true)}
+              className="cursor-pointer group relative py-4"
+              title="..."
+            >
+              <div className="text-[10px] text-white/[0.06] font-mono tracking-[0.2em] text-center leading-relaxed select-none group-hover:text-white/[0.15] transition-all duration-700">
+                ত্রিনয়ন ও ত্রিনয়ন এট্টু জিরো
+              </div>
+              <div className="text-[8px] text-white/[0.04] tracking-[0.5em] text-center uppercase mt-1 group-hover:text-white/[0.12] transition-all duration-700">
+                MURDER WEAPON: As₂O₃ // THE LAST KEY
+              </div>
             </div>
           </div>
         </div>
@@ -383,6 +412,76 @@ export default function FinalRoundPage() {
           onSolve={handleSolve}
         />
       )}
+
+      {/* Final Hidden Riddle Modal */}
+      {showFinalRiddle && (() => {
+        const FinalModal = () => {
+          const [ans, setAns] = useState('');
+          const [err, setErr] = useState('');
+          const [shake2, setShake2] = useState(false);
+          const ref2 = useRef<HTMLInputElement>(null);
+          // eslint-disable-next-line react-hooks/rules-of-hooks
+          useEffect(() => { ref2.current?.focus(); }, []);
+
+          const check = () => {
+            if (ans.trim() === '39039820') {
+              handleFinalSolve();
+            } else {
+              setErr('THE CODE IS WRONG. LOOK CLOSER.');
+              setShake2(true);
+              setTimeout(() => setShake2(false), 600);
+              setAns('');
+            }
+          };
+
+          return (
+            <div className="fixed inset-0 z-[350] flex items-center justify-center p-4">
+              <div className="absolute inset-0 bg-black/97 backdrop-blur-lg" onClick={() => setShowFinalRiddle(false)} />
+              <div className="relative bg-zinc-950 border-2 border-amber-500/40 w-full max-w-xl shadow-[0_0_60px_rgba(245,158,11,0.2)]"
+                style={shake2 ? { animation: 'shake 0.3s ease-in-out' } : {}}>
+                <div className="h-[2px] w-full bg-gradient-to-r from-transparent via-amber-500 to-transparent" />
+                <div className="p-8 md:p-10">
+                  <div className="flex items-center gap-2 mb-1">
+                    <div className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                    <div className="text-xs text-amber-500 font-bold tracking-[0.4em] uppercase">Hidden Cipher Detected</div>
+                  </div>
+                  <h2 className="text-2xl md:text-3xl font-bold text-white tracking-widest uppercase mb-8">The Final Key</h2>
+
+                  <div className="bg-black/70 border border-amber-500/20 px-8 py-7 mb-8 relative">
+                    <div className="absolute top-0 left-0 w-4 h-4 border-t border-l border-amber-500/40" />
+                    <div className="absolute bottom-0 right-0 w-4 h-4 border-b border-r border-amber-500/40" />
+                    <p className="font-mono text-2xl md:text-3xl text-amber-200/90 leading-relaxed tracking-wide text-center">
+                      ত্রিনয়ন ও ত্রিনয়ন এট্টু জিরো
+                    </p>
+                    <div className="mt-4 pt-3 border-t border-amber-500/15 text-center">
+                      <span className="text-xs text-white/20 tracking-widest uppercase">Decode the numbers hidden in the words</span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <input
+                      ref={ref2}
+                      type="text"
+                      value={ans}
+                      onChange={e => { setAns(e.target.value); setErr(''); }}
+                      onKeyDown={e => e.key === 'Enter' && check()}
+                      placeholder="Enter the numeric code..."
+                      className="w-full bg-zinc-900/80 border border-white/15 focus:border-amber-500 text-white text-lg px-5 py-4 outline-none tracking-widest placeholder:text-white/20 transition-all rounded-sm"
+                    />
+                    {err && <div className="text-amber-500 text-sm font-bold tracking-widest animate-pulse">{err}</div>}
+                    <div className="flex gap-3 pt-1">
+                      <button onClick={() => setShowFinalRiddle(false)} className="flex-1 py-3.5 border border-white/10 text-white/40 hover:text-white text-sm font-bold uppercase tracking-widest transition-all rounded-full">Close</button>
+                      <button onClick={check} className="flex-1 py-3.5 bg-amber-600 hover:bg-amber-500 text-white text-sm font-bold uppercase tracking-widest transition-all shadow-[0_0_20px_rgba(245,158,11,0.4)] rounded-full">Unlock</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        };
+        return <FinalModal />;
+      })()}
+
       {showWeapon && (
         <WeaponRevealModal onClose={() => setShowWeapon(false)} />
       )}

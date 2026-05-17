@@ -61,7 +61,9 @@ class FinalRoundSolver(Document):
     leader_name: str
     phone_number: str
     college_name: str
-    solved_at: datetime = Field(default_factory=datetime.utcnow)
+    solved_at: datetime = Field(default_factory=datetime.utcnow)  # When they accessed (first riddle)
+    riddle_solved: bool = False  # Whether they solved the hidden Bengali riddle
+    riddle_solved_at: Optional[datetime] = None
 
     class Settings:
         name = "final_round_solvers"
@@ -619,6 +621,35 @@ async def admin_final_round_solvers(clerk_id: str):
     await verify_admin(clerk_id)
     solvers = await FinalRoundSolver.find_all().sort("+solved_at").to_list()
     return solvers
+
+@app.post("/api/final-round/riddle-solved")
+async def final_round_riddle_solved(request: dict):
+    """Called when a team solves the hidden Bengali riddle (39039820)."""
+    clerk_id = request.get("clerk_id")
+    if not clerk_id:
+        raise HTTPException(status_code=400, detail="clerk_id required")
+    
+    existing = await FinalRoundSolver.find_one(FinalRoundSolver.clerk_id == clerk_id)
+    if not existing:
+        raise HTTPException(status_code=404, detail="Team not found in final round")
+    
+    if existing.riddle_solved:
+        return {"status": "already_solved", "riddle_solved_at": existing.riddle_solved_at}
+    
+    existing.riddle_solved = True
+    existing.riddle_solved_at = datetime.utcnow()
+    await existing.save()
+    return {"status": "riddle_solved", "riddle_solved_at": existing.riddle_solved_at}
+
+@app.delete("/api/admin/final-round/solvers/{clerk_id}")
+async def delete_final_round_solver(clerk_id: str, admin_clerk_id: str):
+    """Admin: remove a team from the final round solver log."""
+    await verify_admin(admin_clerk_id)
+    existing = await FinalRoundSolver.find_one(FinalRoundSolver.clerk_id == clerk_id)
+    if not existing:
+        raise HTTPException(status_code=404, detail="Solver record not found")
+    await existing.delete()
+    return {"status": "deleted"}
 
 # --- ADMIN COMMAND CENTER ENDPOINTS ---
 

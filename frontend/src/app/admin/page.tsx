@@ -5,6 +5,8 @@ import { useUser } from "@clerk/nextjs";
 import { Lock, Unlock, RotateCcw, Database, X, Trash2, Plus, Eye, Download } from 'lucide-react';
 import { API_BASE_URL } from '@/lib/api';
 
+const FINAL_ROUND_BATCH_ID = 10; // Final Round is always batch 10
+
 interface Team {
   clerk_id: string;
   team_name: string;
@@ -85,13 +87,14 @@ export default function AdminDashboard() {
     };
 
     checkAdmin();
+  }, [user, isLoaded]);
 
-    let interval: NodeJS.Timeout;
-    if (isAdmin) {
-      interval = setInterval(fetchData, 5000);
-    }
-    return () => { if (interval) clearInterval(interval); };
-  }, [user, isLoaded, isAdmin]);
+  // Real-time polling — runs every 3s once admin is confirmed
+  useEffect(() => {
+    if (!isAdmin) return;
+    const interval = setInterval(fetchData, 3000);
+    return () => clearInterval(interval);
+  }, [isAdmin]);
 
   const fetchData = async () => {
     const identifier = user?.id || localStorage.getItem('admin_auth_token') || "UNAUTHORIZED";
@@ -146,6 +149,24 @@ export default function AdminDashboard() {
       });
       if (res.ok) fetchData();
     } catch (err) { }
+  };
+
+  const deleteSolver = async (solverClerkId: string, teamName: string, hasSolverRecord: boolean) => {
+    const identifier = getAdminIdentifier();
+    if (!identifier || !confirm(`Completely remove "${teamName}" from Final Round? This removes their registration AND solver log.`)) return;
+    try {
+      // Delete solver record if it exists
+      if (hasSolverRecord) {
+        await fetch(`${API_BASE_URL}/api/admin/final-round/solvers/${solverClerkId}?admin_clerk_id=${identifier}`, {
+          method: 'DELETE'
+        });
+      }
+      // Delete the batch-10 team registration
+      await fetch(`${API_BASE_URL}/api/admin/teams/${solverClerkId}?clerk_id=${identifier}&batch_id=${FINAL_ROUND_BATCH_ID}`, {
+        method: 'DELETE'
+      });
+      fetchData();
+    } catch (err) {}
   };
 
   const exportCSV = (team: Team) => {
@@ -753,91 +774,160 @@ export default function AdminDashboard() {
         );
       })()}
 
-      {/* Final Round Solvers Tab */}
-      {activeTab === 'finalround' && (
-        <div>
-          {/* Header */}
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
-            <div>
-              <div className="text-sm text-crimson-glare/60 tracking-[0.4em] uppercase mb-1">Final Round — Classified</div>
-              <h2 className="text-3xl font-bold text-white tracking-widest uppercase">
-                ☠ Teams That Solved The Cipher
-              </h2>
-              <p className="text-on-surface-variant/40 text-sm mt-1 tracking-widest">
-                {solvers.length} team{solvers.length !== 1 ? 's' : ''} have cracked the riddle
-              </p>
-            </div>
-            <button
-              onClick={() => {
-                const headers = ['Rank', 'Team Name', 'Team ID', 'Leader', 'College', 'Solved At'];
-                const rows = solvers.map((s, i) => [
-                  i + 1,
-                  `"${s.team_name}"`,
-                  `"${s.team_id || 'N/A'}"`,
-                  `"${s.leader_name}"`,
-                  `"${s.college_name}"`,
-                  `"${new Date(s.solved_at).toLocaleString()}"`,
-                ].join(','));
-                const csv = [headers.join(','), ...rows].join('\n');
-                const blob = new Blob([csv], { type: 'text/csv' });
-                const url = URL.createObjectURL(blob);
-                const el = document.createElement('a');
-                el.href = url;
-                el.download = `FinalRound_Solvers_${new Date().toISOString().slice(0,10)}.csv`;
-                el.click();
-                URL.revokeObjectURL(url);
-              }}
-              className="flex items-center gap-2 px-6 py-3 bg-crimson-glare/10 border border-crimson-glare/40 text-crimson-glare hover:bg-crimson-glare/20 text-xs font-bold uppercase tracking-widest transition-all rounded-full"
-            >
-              <Download size={14} /> Export Solvers CSV
-            </button>
-          </div>
+      {/* Final Round Unified View */}
+      {activeTab === 'finalround' && (() => {
+        // Batch-10 teams = everyone who registered for final round
+        const batch10Teams = teams.filter(t => t.batch_id === FINAL_ROUND_BATCH_ID);
 
-          {solvers.length === 0 ? (
-            <div className="border border-dashed border-white/10 p-20 text-center">
-              <div className="text-6xl mb-6 opacity-20">☠</div>
-              <div className="text-on-surface-variant/30 text-sm tracking-[0.5em] uppercase">
-                No teams have solved the cipher yet
+        // Build a clerk_id → solver map for fast lookup
+        const solverMap = new Map(solvers.map((s: any) => [s.clerk_id, s]));
+
+        // Merge: for each batch-10 team, determine tier
+        const unified = batch10Teams.map(t => {
+          const solver = solverMap.get(t.clerk_id);
+          if (!solver) return { ...t, tier: 'registered' as const, solver: null };
+          if (solver.riddle_solved) return { ...t, tier: 'riddle_solved' as const, solver };
+          return { ...t, tier: 'accessed' as const, solver };
+        });
+
+        // Also include any solvers NOT in batch-10 teams (edge case)
+        solvers.forEach((s: any) => {
+          if (!batch10Teams.find(t => t.clerk_id === s.clerk_id)) {
+            unified.push({ ...s, batch_id: FINAL_ROUND_BATCH_ID, answers: [], is_completed: false, total_score: 0, current_question: 0, tier: s.riddle_solved ? 'riddle_solved' : 'accessed', solver: s });
+          }
+        });
+
+        const counts = {
+          registered: unified.filter(r => r.tier === 'registered').length,
+          accessed: unified.filter(r => r.tier === 'accessed').length,
+          riddle_solved: unified.filter(r => r.tier === 'riddle_solved').length,
+        };
+
+        const tierConfig = {
+          riddle_solved: { label: '✓ RIDDLE SOLVED', bg: 'bg-green-500/10', text: 'text-green-400', border: 'border-green-500/20', dot: 'bg-green-500', row: 'hover:bg-green-500/5' },
+          accessed:      { label: 'ACCESSED',        bg: 'bg-amber-500/10', text: 'text-amber-400', border: 'border-amber-500/20', dot: 'bg-amber-500', row: 'hover:bg-amber-500/5' },
+          registered:    { label: 'REGISTERED',      bg: 'bg-red-900/20',   text: 'text-red-400',   border: 'border-red-800/30',   dot: 'bg-red-600',   row: 'hover:bg-red-900/10' },
+        };
+
+        // Sort: riddle_solved first, then accessed, then registered
+        const tierOrder = { riddle_solved: 0, accessed: 1, registered: 2 };
+        const sorted = [...unified].sort((a, b) => tierOrder[a.tier] - tierOrder[b.tier]);
+
+        const exportCSVAll = () => {
+          const headers = ['Status', 'Team Name', 'Team ID', 'Leader', 'College'];
+          const rows = sorted.map(r => [
+            tierConfig[r.tier].label,
+            `"${r.team_name}"`,
+            `"${r.team_id || 'N/A'}"`,
+            `"${r.leader_name}"`,
+            `"${r.college_name}"`,
+          ].join(','));
+          const csv = [headers.join(','), ...rows].join('\n');
+          const blob = new Blob([csv], { type: 'text/csv' });
+          const url = URL.createObjectURL(blob);
+          const el = document.createElement('a'); el.href = url;
+          el.download = `FinalRound_All_${new Date().toISOString().slice(0,10)}.csv`;
+          el.click(); URL.revokeObjectURL(url);
+        };
+
+        return (
+          <div>
+            {/* Header */}
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
+              <div>
+                <div className="text-sm text-crimson-glare/60 tracking-[0.4em] uppercase mb-1">Final Round — Live Tracker</div>
+                <h2 className="text-3xl font-bold text-white tracking-widest uppercase">☠ Final Round Progress</h2>
+                <p className="text-on-surface-variant/40 text-sm mt-1 tracking-widest">{unified.length} total team{unified.length !== 1 ? 's' : ''} in final round</p>
               </div>
+              <button onClick={exportCSVAll} className="flex items-center gap-2 px-6 py-3 bg-crimson-glare/10 border border-crimson-glare/40 text-crimson-glare hover:bg-crimson-glare/20 text-xs font-bold uppercase tracking-widest transition-all rounded-full">
+                <Download size={14} /> Export CSV
+              </button>
             </div>
-          ) : (
-            <div className="overflow-x-auto border border-white/5">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="border-b border-white/5 text-on-surface-variant/40 text-sm tracking-[0.2em] uppercase font-bold bg-zinc-950">
-                    <th className="py-5 px-6">RANK</th>
-                    <th className="py-5 px-6">TEAM NAME</th>
-                    <th className="py-5 px-6">TEAM ID</th>
-                    <th className="py-5 px-6">LEADER</th>
-                    <th className="py-5 px-6">COLLEGE</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-white/5">
-                  {solvers.map((s, i) => (
-                    <tr key={s.clerk_id} className="hover:bg-crimson-glare/5 transition-colors">
-                      <td className="py-6 px-6">
-                        <span className="text-crimson-glare font-bold text-2xl">#{i + 1}</span>
-                      </td>
-                      <td className="py-6 px-6">
-                        <div className="font-bold text-white text-base">{s.team_name}</div>
-                      </td>
-                      <td className="py-6 px-6">
-                        <span className="text-on-surface-variant/60 text-sm font-mono">{s.team_id || '—'}</span>
-                      </td>
-                      <td className="py-6 px-6">
-                        <span className="text-on-surface-variant/70 text-base">{s.leader_name}</span>
-                      </td>
-                      <td className="py-6 px-6">
-                        <span className="text-on-surface-variant/60 text-sm">{s.college_name}</span>
-                      </td>
+
+            {/* Stat Pills */}
+            <div className="grid grid-cols-3 gap-4 mb-8">
+              {[
+                { tier: 'registered', icon: '🔴', label: 'Registered', count: counts.registered, desc: 'Signed up, not yet accessed' },
+                { tier: 'accessed',   icon: '🟡', label: 'Accessed',   count: counts.accessed,   desc: 'Solved Nescafe, got CODE:FIST' },
+                { tier: 'riddle_solved', icon: '🟢', label: 'Riddle Solved', count: counts.riddle_solved, desc: 'Cracked the hidden cipher' },
+              ].map(({ tier, icon, label, count, desc }) => {
+                const cfg = tierConfig[tier as keyof typeof tierConfig];
+                return (
+                  <div key={tier} className={`p-6 border ${cfg.border} ${cfg.bg} relative overflow-hidden`}>
+                    <div className={`absolute top-0 left-0 w-1 h-full ${cfg.dot}`} />
+                    <div className={`text-4xl font-bold ${cfg.text} mb-1`}>{count}</div>
+                    <div className={`text-xs font-bold uppercase tracking-widest ${cfg.text} mb-1`}>{icon} {label}</div>
+                    <div className="text-[10px] text-white/30 tracking-wide">{desc}</div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Table */}
+            {unified.length === 0 ? (
+              <div className="border border-dashed border-white/10 p-20 text-center">
+                <div className="text-6xl mb-6 opacity-20">☠</div>
+                <div className="text-on-surface-variant/30 text-sm tracking-[0.5em] uppercase">No teams registered for final round yet</div>
+              </div>
+            ) : (
+              <div className="overflow-x-auto border border-white/5">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="border-b border-white/5 text-on-surface-variant/40 text-sm tracking-[0.2em] uppercase font-bold bg-zinc-950">
+                      <th className="py-5 px-6">#</th>
+                      <th className="py-5 px-6">TEAM NAME</th>
+                      <th className="py-5 px-6">TEAM ID</th>
+                      <th className="py-5 px-6">LEADER</th>
+                      <th className="py-5 px-6">COLLEGE</th>
+                      <th className="py-5 px-6">STATUS</th>
+                      <th className="py-5 px-6">ACTIONS</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      )}
+                  </thead>
+                  <tbody className="divide-y divide-white/5">
+                    {sorted.map((r, i) => {
+                      const cfg = tierConfig[r.tier];
+                      return (
+                        <tr key={r.clerk_id} className={`transition-colors ${cfg.row}`}>
+                          <td className="py-5 px-6">
+                            <div className={`w-2 h-2 rounded-full ${cfg.dot} inline-block mr-3`} />
+                            <span className="text-white/30 text-sm">#{i + 1}</span>
+                          </td>
+                          <td className="py-5 px-6">
+                            <div className="font-bold text-white text-base">{r.team_name}</div>
+                          </td>
+                          <td className="py-5 px-6">
+                            <span className="text-on-surface-variant/60 text-sm font-mono">{r.team_id || '—'}</span>
+                          </td>
+                          <td className="py-5 px-6">
+                            <span className="text-on-surface-variant/70 text-base">{r.leader_name}</span>
+                          </td>
+                          <td className="py-5 px-6">
+                            <span className="text-on-surface-variant/60 text-sm">{r.college_name}</span>
+                          </td>
+                          <td className="py-5 px-6">
+                            <span className={`text-xs px-4 py-2 font-bold tracking-widest uppercase ${cfg.bg} ${cfg.text} border ${cfg.border} ${r.tier === 'accessed' ? 'animate-pulse' : ''}`}>
+                              {cfg.label}
+                            </span>
+                          </td>
+                          <td className="py-5 px-6">
+                            <button
+                              onClick={() => deleteSolver(r.clerk_id, r.team_name, !!r.solver)}
+                              className="p-2 bg-zinc-900 border border-white/10 text-white/30 hover:text-red-500 hover:border-red-500 hover:bg-red-500/10 transition-all"
+                              title="Remove from Final Round completely"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        );
+      })()}
     </div>
     </div>
   );

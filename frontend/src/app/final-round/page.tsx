@@ -303,7 +303,17 @@ export default function FinalRoundPage() {
     // Don't auto-show weapon — the final hidden riddle gates it
   };
 
-  const handleFinalSolve = () => {
+  const handleFinalSolve = async () => {
+    // Record that the team solved the hidden riddle
+    if (user) {
+      try {
+        await fetch(`${API_BASE_URL}/api/final-round/riddle-solved`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ clerk_id: user.id })
+        });
+      } catch (e) { /* silent fail */ }
+    }
     setShowFinalRiddle(false);
     setTimeout(() => setShowWeapon(true), 300);
   };

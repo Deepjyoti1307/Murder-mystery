@@ -44,7 +44,10 @@ export default function Dashboard() {
     setIsPending(true);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/batch/${selectedBatch}/enter`, {
+      // Final Round is displayed as batch 4 in UI but maps to batch_id 10 in DB
+      const apiBatchId = selectedBatch === 4 ? 10 : selectedBatch;
+
+      const response = await fetch(`${API_BASE_URL}/api/batch/${apiBatchId}/enter`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -63,8 +66,15 @@ export default function Dashboard() {
       const data = await response.json();
 
       if (response.ok) {
-        // Success! Redirect to the story section
-        router.push(`/story/${selectedBatch}`);
+        // Final Round goes to its own special page
+        if (selectedBatch === 4) {
+          router.push(`/final-round`);
+        } else if (selectedBatch === 3) {
+          router.push(`/story/3`);
+        } else {
+          router.push(`/story/${selectedBatch}`);
+        }
+
       } else {
         const errorMsg = typeof data.detail === 'string'
           ? data.detail
@@ -121,82 +131,121 @@ export default function Dashboard() {
         <div className="p-4 md:p-8 lg:p-12 space-y-8 md:space-y-12 max-w-7xl mx-auto w-full">
           {/* Welcome Intro */}
           <div className="space-y-3 md:space-y-4 text-center md:text-left">
+            <div className="flex items-center gap-3 justify-center md:justify-start">
+              <div className="w-8 h-[2px] bg-blood-red" />
+              <span className="text-[9px] text-blood-red font-bold tracking-[0.5em] uppercase">Clearance Level: Operative</span>
+              <div className="w-8 h-[2px] bg-blood-red" />
+            </div>
             <h2 className="font-headline-xl text-3xl md:text-5xl text-on-surface uppercase tracking-widest opacity-90">
               Classified Archive
             </h2>
-            <p className="font-body-lg text-on-surface-variant/60 max-w-2xl leading-relaxed mx-auto md:mx-0 text-sm md:text-base">
-              Select an assigned evidence batch to proceed. Access is strictly compartmentalized based on current investigation progress and clearance verification.
+            <p className="font-body-lg text-on-surface-variant/50 max-w-2xl leading-relaxed mx-auto md:mx-0 text-sm md:text-base">
+              Select your assigned evidence batch. Access is strictly compartmentalized. Unauthorized entry will be logged.
             </p>
           </div>
 
           {/* Batches Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {/* Batch 1 */}
-            <button
-              onClick={() => handleBatchClick(1)}
-              className="group relative bg-void-black/60 border-2 border-blood-red/30 p-1 hover:border-crimson-glare transition-all duration-500 shadow-[0_0_20px_rgba(0,0,0,0.3)] text-left"
-            >
-              <div className="absolute top-4 right-4 bg-blood-red/10 border border-blood-red/40 text-blood-red text-[10px] px-3 py-1 uppercase font-bold tracking-widest">
-                Locked
-              </div>
-              <div className="p-8 space-y-8 flex flex-col items-center">
-                <h3 className="font-headline-xl text-3xl text-on-surface uppercase tracking-widest w-full">Batch 1</h3>
-                <div className="relative py-12">
-                  <span className="material-symbols-outlined text-8xl text-on-surface-variant/20 group-hover:text-blood-red/40 transition-colors duration-500">lock</span>
-                </div>
-                <p className="font-body-md text-on-surface-variant/60 text-center leading-relaxed">
-                  Initial evidence collection regarding the Sector 4 anomaly. Contains crime scene photography, witness transcripts, and preliminary autopsy reports.
-                </p>
-                <div className="w-full bg-blood-red/20 border-2 border-blood-red group-hover:bg-blood-red text-white py-4 font-headline-xl text-xl uppercase tracking-widest transition-all duration-300 text-center">
-                  Unlock Access
-                </div>
-              </div>
-            </button>
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5 md:gap-6">
 
-            {/* Batch 2 */}
-            <button
-              onClick={() => handleBatchClick(2)}
-              className="group relative bg-void-black/60 border-2 border-blood-red/30 p-1 hover:border-crimson-glare transition-all duration-500 shadow-[0_0_20px_rgba(0,0,0,0.3)] text-left"
-            >
-              <div className="absolute top-4 right-4 bg-blood-red/10 border border-blood-red/40 text-blood-red text-[10px] px-3 py-1 uppercase font-bold tracking-widest">
-                Locked
-              </div>
-              <div className="p-8 space-y-8 flex flex-col items-center">
-                <h3 className="font-headline-xl text-3xl text-on-surface uppercase tracking-widest w-full text-center">Batch 2</h3>
-                <div className="relative py-12 text-center w-full">
-                  <span className="material-symbols-outlined text-8xl text-on-surface-variant/20 group-hover:text-blood-red/40 transition-colors duration-500">lock</span>
-                </div>
-                <p className="font-body-md text-on-surface-variant/60 text-center leading-relaxed h-20">
-                  Secondary evidence compartment. Access restricted pending completion of Batch 1 analysis.
-                </p>
-                <div className="w-full bg-blood-red/20 border-2 border-blood-red group-hover:bg-blood-red text-white py-4 font-headline-xl text-xl uppercase tracking-widest transition-all duration-300 text-center">
-                  Unlock Access
-                </div>
-              </div>
-            </button>
+            {/* ── Batch Cards 1, 2, 3 ── */}
+            {[
+              { id: 1, label: 'Batch 1', desc: 'Initial crime scene evidence. Witness transcripts, photography & preliminary autopsy reports.' },
+              { id: 2, label: 'Batch 2', desc: 'Secondary evidence compartment. Intercepted communications & surveillance data.' },
+              { id: 3, label: 'Batch 3', desc: 'Tertiary archive. Deep case files with restricted forensic analysis documents.' },
+            ].map(({ id, label, desc }) => (
+              <button
+                key={id}
+                onClick={() => handleBatchClick(id)}
+                className="group relative flex flex-col bg-zinc-950 border border-blood-red/20 hover:border-blood-red/60 transition-all duration-500 text-left overflow-hidden"
+                style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.5)' }}
+                onMouseEnter={e => (e.currentTarget.style.boxShadow = '0 0 32px rgba(139,0,0,0.25), 0 4px 24px rgba(0,0,0,0.5)')}
+                onMouseLeave={e => (e.currentTarget.style.boxShadow = '0 4px 24px rgba(0,0,0,0.5)')}
+              >
+                {/* Top shimmer bar */}
+                <div className="h-[2px] w-full bg-gradient-to-r from-transparent via-blood-red/50 to-transparent group-hover:via-crimson-glare/80 transition-all duration-500" />
 
-            {/* Batch 3 */}
-            <button
-              onClick={() => handleBatchClick(3)}
-              className="group relative bg-void-black/60 border-2 border-blood-red/30 p-1 hover:border-crimson-glare transition-all duration-500 shadow-[0_0_20px_rgba(0,0,0,0.3)] text-left"
-            >
-              <div className="absolute top-4 right-4 bg-blood-red/10 border border-blood-red/40 text-blood-red text-[10px] px-3 py-1 uppercase font-bold tracking-widest">
-                Locked
-              </div>
-              <div className="p-8 space-y-8 flex flex-col items-center">
-                <h3 className="font-headline-xl text-3xl text-on-surface uppercase tracking-widest w-full text-center">Batch 3</h3>
-                <div className="relative py-12 text-center w-full">
-                  <span className="material-symbols-outlined text-8xl text-on-surface-variant/20 group-hover:text-blood-red/40 transition-colors duration-500">lock</span>
+                {/* Locked badge — pill shaped */}
+                <div className="absolute top-4 right-4 flex items-center gap-1.5 bg-black/70 border border-blood-red/25 rounded-full px-3 py-1">
+                  <div className="w-1.5 h-1.5 rounded-full bg-blood-red/50" />
+                  <span className="text-blood-red/60 text-[9px] font-bold tracking-[0.3em] uppercase">Locked</span>
                 </div>
-                <p className="font-body-md text-on-surface-variant/60 text-center leading-relaxed h-20">
-                  Final evidence repository. High-level encryption applied. Requires maximum clearance for access.
+
+                <div className="flex flex-col flex-1 p-6 md:p-7 gap-5">
+                  <div>
+                    <div className="text-[9px] text-blood-red/35 tracking-[0.5em] uppercase font-bold mb-1">Evidence Archive</div>
+                    <h3 className="font-headline-xl text-2xl md:text-3xl text-white uppercase tracking-widest">{label}</h3>
+                  </div>
+
+                  <div className="flex-1 flex items-center justify-center py-8">
+                    <div className="relative flex items-center justify-center w-16 h-16">
+                      <div className="absolute inset-0 rounded-full bg-blood-red/5 group-hover:bg-blood-red/12 blur-xl scale-[2.5] transition-all duration-700" />
+                      <span className="material-symbols-outlined text-5xl text-white/10 group-hover:text-blood-red/35 transition-colors duration-500 relative z-10">lock</span>
+                    </div>
+                  </div>
+
+                  <p className="text-on-surface-variant/40 text-sm leading-relaxed text-center" style={{ minHeight: '3.5rem' }}>{desc}</p>
+
+                  {/* Pill button */}
+                  <div className="w-full bg-blood-red/8 group-hover:bg-blood-red border border-blood-red/30 group-hover:border-blood-red rounded-full py-3 text-blood-red/60 group-hover:text-white text-[11px] font-bold uppercase tracking-[0.35em] transition-all duration-300 text-center">
+                    Unlock Access
+                  </div>
+                </div>
+              </button>
+            ))}
+
+            {/* ── Final Round Card ── */}
+            <button
+              onClick={() => handleBatchClick(4)}
+              className="group relative flex flex-col bg-zinc-950 border border-blood-red/40 hover:border-crimson-glare text-left overflow-hidden transition-all duration-500"
+              style={{ boxShadow: '0 0 20px rgba(139,0,0,0.12)' }}
+              onMouseEnter={e => (e.currentTarget.style.boxShadow = '0 0 60px rgba(220,20,60,0.35), 0 0 120px rgba(139,0,0,0.1)')}
+              onMouseLeave={e => (e.currentTarget.style.boxShadow = '0 0 20px rgba(139,0,0,0.12)')}
+            >
+              {/* Animated top bar */}
+              <div className="h-[2px] w-full bg-gradient-to-r from-transparent via-crimson-glare to-transparent" style={{ animation: 'pulse 2s ease-in-out infinite' }} />
+
+              {/* Crimson radial bg */}
+              <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(ellipse at 50% 0%, rgba(139,0,0,0.2) 0%, transparent 65%)' }} />
+
+              {/* Scanline texture */}
+              <div className="absolute inset-0 pointer-events-none opacity-[0.025]" style={{ backgroundImage: 'repeating-linear-gradient(0deg, white 0px, white 1px, transparent 1px, transparent 4px)' }} />
+
+              {/* TOP SECRET badge */}
+              <div className="absolute top-4 right-4 flex items-center gap-1.5 bg-crimson-glare/12 border border-crimson-glare/50 rounded-full px-3 py-1">
+                <div className="w-1.5 h-1.5 rounded-full bg-crimson-glare animate-pulse" />
+                <span className="text-crimson-glare text-[9px] font-bold tracking-[0.3em] uppercase">Top Secret</span>
+              </div>
+
+              <div className="flex flex-col flex-1 p-6 md:p-7 gap-5 relative z-10">
+                <div>
+                  <div className="text-[9px] text-crimson-glare/50 tracking-[0.5em] uppercase font-bold mb-1">TechTrix 2026 — Classified</div>
+                  <h3 className="font-headline-xl text-2xl md:text-3xl text-crimson-glare uppercase tracking-widest leading-snug" style={{ textShadow: '0 0 25px rgba(220,20,60,0.5)' }}>
+                    Final<br/>Round
+                  </h3>
+                </div>
+
+                {/* Skull with pulsing rings */}
+                <div className="flex-1 flex items-center justify-center py-8">
+                  <div className="relative flex items-center justify-center w-16 h-16">
+                    <div className="absolute w-24 h-24 rounded-full border border-blood-red/20 group-hover:border-blood-red/50 group-hover:scale-110 transition-all duration-700" />
+                    <div className="absolute w-32 h-32 rounded-full border border-blood-red/10 group-hover:border-blood-red/25 group-hover:scale-110 transition-all duration-1000" />
+                    <div className="absolute inset-0 bg-blood-red/15 group-hover:bg-blood-red/30 blur-2xl rounded-full scale-[3] transition-all duration-700" />
+                    <div className="text-4xl relative z-10 group-hover:scale-110 transition-transform duration-500" style={{ filter: 'drop-shadow(0 0 16px rgba(220,20,60,0.8))', opacity: 0.75 }}>☠</div>
+                  </div>
+                </div>
+
+                <p className="text-crimson-glare/40 group-hover:text-crimson-glare/65 text-sm leading-relaxed text-center transition-colors duration-300" style={{ minHeight: '3.5rem' }}>
+                  The final confrontation. One case. Five suspects. Only the sharpest minds enter.
                 </p>
-                <div className="w-full bg-blood-red/20 border-2 border-blood-red group-hover:bg-blood-red text-white py-4 font-headline-xl text-xl uppercase tracking-widest transition-all duration-300 text-center">
-                  Unlock Access
+
+                {/* Crimson pill button */}
+                <div className="w-full bg-crimson-glare/10 group-hover:bg-crimson-glare border border-crimson-glare/45 group-hover:border-crimson-glare rounded-full py-3 text-crimson-glare group-hover:text-white text-[11px] font-bold uppercase tracking-[0.35em] transition-all duration-300 text-center">
+                  Enter Final Round
                 </div>
               </div>
             </button>
           </div>
+
 
           {/* Return Home Link */}
           <div className="pt-8 border-t border-blood-red/10 flex justify-center">
@@ -216,7 +265,9 @@ export default function Dashboard() {
             <div className="flex justify-between items-start mb-10 border-b-2 border-blood-red/20 pb-6">
               <div>
             <h2 className="font-headline-xl text-2xl md:text-4xl lg:text-5xl text-on-surface tracking-widest uppercase">Access Request</h2>
-                <p className="text-crimson-glare font-body-md uppercase mt-2 tracking-[0.2em]">Batch 0{selectedBatch} // Security Protocol 9</p>
+                <p className="text-crimson-glare font-body-md uppercase mt-2 tracking-[0.2em]">
+                  {selectedBatch === 4 ? 'Final Round' : `Batch 0${selectedBatch}`} // Security Protocol 9
+                </p>
               </div>
               <button onClick={() => setIsModalOpen(false)} className="text-on-surface/40 hover:text-white transition-colors">
                 <span className="material-symbols-outlined text-3xl">close</span>

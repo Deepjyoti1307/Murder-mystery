@@ -54,6 +54,18 @@ class Batch(Document):
     class Settings:
         name = "batches"
 
+class FinalRoundSolver(Document):
+    clerk_id: str
+    team_name: str
+    team_id: Optional[str] = None
+    leader_name: str
+    phone_number: str
+    college_name: str
+    solved_at: datetime = Field(default_factory=datetime.utcnow)
+
+    class Settings:
+        name = "final_round_solvers"
+
 # --- API SCHEMAS ---
 
 class AccessRequest(BaseModel):
@@ -67,6 +79,14 @@ class AccessRequest(BaseModel):
 
 class StartRequest(BaseModel):
     clerk_id: str
+
+class FinalRoundSolveRequest(BaseModel):
+    clerk_id: str
+    team_name: str
+    team_id: Optional[str] = None
+    leader_name: str
+    phone_number: str
+    college_name: str
 
 # --- LIFESPAN (NEW STARTUP PATTERN) ---
 
@@ -88,7 +108,7 @@ async def lifespan(app: FastAPI):
         # Initialize Beanie with the specific database name
         # If DB_NAME is in .env use it, else default to 'murder_mystery'
         db_name = os.getenv("DB_NAME", "murder_mystery")
-        await init_beanie(database=client[db_name], document_models=[User, Team, Batch])
+        await init_beanie(database=client[db_name], document_models=[User, Team, Batch, FinalRoundSolver])
         print(f"DATABASE CONNECTED: {db_name}")
     except Exception as e:
         print(f"DATABASE CONNECTION ERROR: {e}")
@@ -571,6 +591,34 @@ async def get_leaderboard(batch_id: int):
     # Sort by score (desc) then duration (asc)
     leaderboard.sort(key=lambda x: (-x["score"], x["duration"]))
     return leaderboard
+
+# --- FINAL ROUND ENDPOINTS ---
+
+@app.post("/api/final-round/solved")
+async def final_round_solved(request: FinalRoundSolveRequest):
+    """Called from frontend when a team correctly answers the cipher riddle."""
+    # Avoid duplicate entries for the same team
+    existing = await FinalRoundSolver.find_one(FinalRoundSolver.clerk_id == request.clerk_id)
+    if existing:
+        return {"status": "already_recorded", "solved_at": existing.solved_at}
+    
+    solver = FinalRoundSolver(
+        clerk_id=request.clerk_id,
+        team_name=request.team_name,
+        team_id=request.team_id,
+        leader_name=request.leader_name,
+        phone_number=request.phone_number,
+        college_name=request.college_name,
+    )
+    await solver.insert()
+    return {"status": "recorded", "solved_at": solver.solved_at}
+
+@app.get("/api/admin/final-round/solvers")
+async def admin_final_round_solvers(clerk_id: str):
+    """Admin endpoint: returns all teams who solved the Final Round cipher."""
+    await verify_admin(clerk_id)
+    solvers = await FinalRoundSolver.find_all().sort("+solved_at").to_list()
+    return solvers
 
 # --- ADMIN COMMAND CENTER ENDPOINTS ---
 

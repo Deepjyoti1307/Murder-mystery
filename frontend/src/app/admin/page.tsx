@@ -46,10 +46,11 @@ export default function AdminDashboard() {
   const [teams, setTeams] = useState<Team[]>([]);
   const [batches, setBatches] = useState<Batch[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'teams' | 'batches'>('teams');
+  const [activeTab, setActiveTab] = useState<'teams' | 'batches' | 'finalround'>('teams');
   const [editingBatch, setEditingBatch] = useState<Batch | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [viewingTeam, setViewingTeam] = useState<Team | null>(null);
+  const [solvers, setSolvers] = useState<any[]>([]);
 
   useEffect(() => {
     const checkAdmin = async () => {
@@ -93,17 +94,18 @@ export default function AdminDashboard() {
   }, [user, isLoaded, isAdmin]);
 
   const fetchData = async () => {
-    // We allow fetching if either Clerk user is admin OR secret token exists
     const identifier = user?.id || localStorage.getItem('admin_auth_token') || "UNAUTHORIZED";
     try {
-      const [tRes, bRes] = await Promise.all([
+      const [tRes, bRes, sRes] = await Promise.all([
         fetch(`${API_BASE_URL}/api/admin/teams?clerk_id=${identifier}`),
-        fetch(`${API_BASE_URL}/api/admin/batches?clerk_id=${identifier}`)
+        fetch(`${API_BASE_URL}/api/admin/batches?clerk_id=${identifier}`),
+        fetch(`${API_BASE_URL}/api/admin/final-round/solvers?clerk_id=${identifier}`),
       ]);
       const tData = await tRes.json();
       const bData = await bRes.json();
       setTeams(tData);
       setBatches(bData);
+      if (sRes.ok) setSolvers(await sRes.json());
     } catch (err) {
       console.error("DATA FETCH ERROR");
     } finally {
@@ -282,24 +284,30 @@ export default function AdminDashboard() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-4 border-b border-white/10 mb-8">
+      <div className="flex gap-4 border-b border-white/10 mb-8 overflow-x-auto">
         <button
           onClick={() => setActiveTab('teams')}
-          className={`pb-4 px-6 text-xs font-bold tracking-[0.3em] uppercase transition-all ${activeTab === 'teams' ? 'text-blood-red border-b-2 border-blood-red' : 'text-on-surface-variant/40 hover:text-white'}`}
+          className={`pb-4 px-6 text-xs font-bold tracking-[0.3em] uppercase transition-all whitespace-nowrap ${activeTab === 'teams' ? 'text-blood-red border-b-2 border-blood-red' : 'text-on-surface-variant/40 hover:text-white'}`}
         >
           TEAM OPERATIONS
         </button>
         <button
           onClick={() => setActiveTab('batches')}
-          className={`pb-4 px-6 text-xs font-bold tracking-[0.3em] uppercase transition-all ${activeTab === 'batches' ? 'text-blood-red border-b-2 border-blood-red' : 'text-on-surface-variant/40 hover:text-white'}`}
+          className={`pb-4 px-6 text-xs font-bold tracking-[0.3em] uppercase transition-all whitespace-nowrap ${activeTab === 'batches' ? 'text-blood-red border-b-2 border-blood-red' : 'text-on-surface-variant/40 hover:text-white'}`}
         >
           BATCH CONTROL
+        </button>
+        <button
+          onClick={() => setActiveTab('finalround')}
+          className={`pb-4 px-6 text-xs font-bold tracking-[0.3em] uppercase transition-all whitespace-nowrap flex items-center gap-2 ${activeTab === 'finalround' ? 'text-crimson-glare border-b-2 border-crimson-glare' : 'text-on-surface-variant/40 hover:text-crimson-glare'}`}
+        >
+          <span>☠</span> FINAL ROUND SOLVERS
         </button>
       </div>
 
       {/* Content */}
       <div className="animate-fadeIn">
-        {activeTab === 'teams' ? (
+        {activeTab === 'teams' && (
           <div>
             <div className="flex justify-end mb-4">
               <button
@@ -401,7 +409,9 @@ export default function AdminDashboard() {
             </table>
           </div>
           </div>
-        ) : (
+        )}
+
+        {activeTab === 'batches' && (
           <div className="space-y-24">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
               {batches.map((batch) => (
@@ -411,8 +421,8 @@ export default function AdminDashboard() {
                   </div>
                   <div className="flex justify-between items-start relative z-10">
                     <div className="space-y-2">
-                      <span className="text-xs text-on-surface-variant/40 font-bold uppercase tracking-[0.2em]">OPERATIONAL BATCH</span>
-                      <h3 className="text-4xl font-bold text-white">BATCH {batch.batch_id}</h3>
+                      <span className="text-xs text-on-surface-variant/40 font-bold uppercase tracking-[0.2em]">{batch.batch_id === 10 ? 'CLASSIFIED' : 'OPERATIONAL BATCH'}</span>
+                      <h3 className="text-4xl font-bold text-white">{batch.batch_id === 10 ? 'FINAL ROUND' : `BATCH ${batch.batch_id}`}</h3>
                     </div>
                     <div className={`p-5 rounded-sm ${batch.is_locked ? 'bg-blood-red/10 text-blood-red' : 'bg-green-500/10 text-green-500'}`}>
                       {batch.is_locked ? <Lock size={32} /> : <Unlock size={32} />}
@@ -467,7 +477,6 @@ export default function AdminDashboard() {
             </div>
           </div>
         )}
-      </div>
 
     {/* Batch Editor Modal */}
       {editingBatch && (
@@ -653,8 +662,9 @@ export default function AdminDashboard() {
                </button>
             </div>
           </div>
-        </div>
-      )}
+         </div>
+        )}
+
 
       {/* Team Detail Modal */}
       {viewingTeam && (() => {
@@ -742,6 +752,93 @@ export default function AdminDashboard() {
           </div>
         );
       })()}
+
+      {/* Final Round Solvers Tab */}
+      {activeTab === 'finalround' && (
+        <div>
+          {/* Header */}
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
+            <div>
+              <div className="text-sm text-crimson-glare/60 tracking-[0.4em] uppercase mb-1">Final Round — Classified</div>
+              <h2 className="text-3xl font-bold text-white tracking-widest uppercase">
+                ☠ Teams That Solved The Cipher
+              </h2>
+              <p className="text-on-surface-variant/40 text-sm mt-1 tracking-widest">
+                {solvers.length} team{solvers.length !== 1 ? 's' : ''} have cracked the riddle
+              </p>
+            </div>
+            <button
+              onClick={() => {
+                const headers = ['Rank', 'Team Name', 'Team ID', 'Leader', 'College', 'Solved At'];
+                const rows = solvers.map((s, i) => [
+                  i + 1,
+                  `"${s.team_name}"`,
+                  `"${s.team_id || 'N/A'}"`,
+                  `"${s.leader_name}"`,
+                  `"${s.college_name}"`,
+                  `"${new Date(s.solved_at).toLocaleString()}"`,
+                ].join(','));
+                const csv = [headers.join(','), ...rows].join('\n');
+                const blob = new Blob([csv], { type: 'text/csv' });
+                const url = URL.createObjectURL(blob);
+                const el = document.createElement('a');
+                el.href = url;
+                el.download = `FinalRound_Solvers_${new Date().toISOString().slice(0,10)}.csv`;
+                el.click();
+                URL.revokeObjectURL(url);
+              }}
+              className="flex items-center gap-2 px-6 py-3 bg-crimson-glare/10 border border-crimson-glare/40 text-crimson-glare hover:bg-crimson-glare/20 text-xs font-bold uppercase tracking-widest transition-all rounded-full"
+            >
+              <Download size={14} /> Export Solvers CSV
+            </button>
+          </div>
+
+          {solvers.length === 0 ? (
+            <div className="border border-dashed border-white/10 p-20 text-center">
+              <div className="text-6xl mb-6 opacity-20">☠</div>
+              <div className="text-on-surface-variant/30 text-sm tracking-[0.5em] uppercase">
+                No teams have solved the cipher yet
+              </div>
+            </div>
+          ) : (
+            <div className="overflow-x-auto border border-white/5">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-white/5 text-on-surface-variant/40 text-sm tracking-[0.2em] uppercase font-bold bg-zinc-950">
+                    <th className="py-5 px-6">RANK</th>
+                    <th className="py-5 px-6">TEAM NAME</th>
+                    <th className="py-5 px-6">TEAM ID</th>
+                    <th className="py-5 px-6">LEADER</th>
+                    <th className="py-5 px-6">COLLEGE</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                  {solvers.map((s, i) => (
+                    <tr key={s.clerk_id} className="hover:bg-crimson-glare/5 transition-colors">
+                      <td className="py-6 px-6">
+                        <span className="text-crimson-glare font-bold text-2xl">#{i + 1}</span>
+                      </td>
+                      <td className="py-6 px-6">
+                        <div className="font-bold text-white text-base">{s.team_name}</div>
+                      </td>
+                      <td className="py-6 px-6">
+                        <span className="text-on-surface-variant/60 text-sm font-mono">{s.team_id || '—'}</span>
+                      </td>
+                      <td className="py-6 px-6">
+                        <span className="text-on-surface-variant/70 text-base">{s.leader_name}</span>
+                      </td>
+                      <td className="py-6 px-6">
+                        <span className="text-on-surface-variant/60 text-sm">{s.college_name}</span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
     </div>
   );
 }

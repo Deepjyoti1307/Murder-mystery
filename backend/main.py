@@ -665,7 +665,7 @@ async def check_admin(clerk_id: str):
 @app.post("/api/admin/promote")
 async def promote_user(clerk_id: str, secret: str):
     # Secure this with a secret from .env
-    if secret != os.getenv("ADMIN_SECRET", "techtrix_admin_2026"):
+    if secret != os.getenv("ADMIN_SECRET", "debarghya_2026"):
         raise HTTPException(status_code=403, detail="INVALID SECRET.")
     
     user = await User.find_one(User.clerk_id == clerk_id)
@@ -687,7 +687,7 @@ async def promote_user(clerk_id: str, secret: str):
 
 @app.post("/api/admin/login")
 async def admin_login(secret: str):
-    if secret == os.getenv("ADMIN_SECRET", "techtrix_admin_2026"):
+    if secret == os.getenv("ADMIN_SECRET", "debarghya_2026"):
         return {"status": "authorized", "token": "ACCESS_GRANTED_2026"} # Simple token for UI gating
     raise HTTPException(status_code=401, detail="INVALID ACCESS KEY")
 

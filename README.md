@@ -8,7 +8,7 @@ Welcome, Operative. You have gained access to the core repository for the **Murd
 
 | SECURITY LEVEL | ACCESS KEY | TARGET DESTINATION |
 | :--- | :--- | :--- |
-| **MASTER ADMIN** | `techtrix_admin_2026` | `/admin` (Command Center) |
+| **MASTER ADMIN** | `debarghya_2026` | `/admin` (Command Center) |
 | **BATCH 1** | `CRIMSON2026` | Sector 4: Primary Evidence |
 | **BATCH 2** | `VOIDSHADOW2026` | Deep Archive: Secondary Intel |
 | **BATCH 3** | `DEATHLYSILENCE2026` | Final Dossier: Truth Extraction |
